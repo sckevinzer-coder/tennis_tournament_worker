@@ -71,10 +71,10 @@ registrationRequestApi.post('/:id/approve', async (c) => {
   if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
-  const [request] = await db.select().from(registrationRequests).where(eq(registrationRequests.id, id)).limit(1)
+  const request = (await db.select().from(registrationRequests).where(eq(registrationRequests.id, id)).limit(1))[0]
   if (!request) return c.json({ message: 'Registration request not found' }, 404)
   if (request.status === 'approved') return c.json({ message: '이미 승인된 신청입니다.' }, 400)
-  const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, request.tournamentId)).limit(1)
+  const tournament = (await db.select().from(tournaments).where(eq(tournaments.id, request.tournamentId)).limit(1))[0]
   if (!tournament) return c.json({ message: 'Tournament not found' }, 404)
   const names = parseNames(request.memberNames)
   const finalNames = names.length > 0 ? names : [request.participantName]
@@ -96,8 +96,13 @@ registrationRequestApi.post('/:id/approve', async (c) => {
     const clash = existingTeams.some((t) =>
       [t.player1Id, t.player2Id].includes(p1.id) || [t.player1Id, t.player2Id].includes(p2.id))
     if (!clash) {
-      const [pp1] = await db.select().from(participants).where(eq(participants.id, p1.id)).limit(1)
-      const [pp2] = await db.select().from(participants).where(eq(participants.id, p2.id)).limit(1)
+      // 병렬화: pp1/pp2 동시 조회 (2RTT → 1RTT)
+      const [a1, a2] = await Promise.all([
+        db.select().from(participants).where(eq(participants.id, p1.id)).limit(1),
+        db.select().from(participants).where(eq(participants.id, p2.id)).limit(1),
+      ])
+      const pp1 = a1[0]
+      const pp2 = a2[0]
       if (pp1 && pp2) {
         await db.insert(teams).values({
           tournamentId: request.tournamentId,

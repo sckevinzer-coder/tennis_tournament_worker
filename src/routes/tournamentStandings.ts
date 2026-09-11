@@ -11,10 +11,14 @@ import { tournamentApi } from './tournaments'
 tournamentApi.get('/:id/standings', async (c) => {
   const db = getDb(c.env.DB)
   const tournamentId = Number(c.req.param('id'))
-  const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1)
+  // 병렬화: tournament + matches + groups 동시 조회 (3RTT → 1RTT)
+  const [tArr, matchList, groupList] = await Promise.all([
+    db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1),
+    db.select().from(matches).where(eq(matches.tournamentId, tournamentId)),
+    db.select().from(groups).where(eq(groups.tournamentId, tournamentId)),
+  ])
+  const tournament = tArr[0]
   if (!tournament) return c.json({ message: 'Tournament not found' }, 404)
-  const matchList = await db.select().from(matches).where(eq(matches.tournamentId, tournamentId))
-  const groupList = await db.select().from(groups).where(eq(groups.tournamentId, tournamentId))
   if (tournament.matchType === 'doubles' && tournament.doublesMode === 'team') {
     if (groupList.length === 0) {
       const teamList = await db.select().from(teams).where(eq(teams.tournamentId, tournamentId))

@@ -95,19 +95,20 @@ export async function propagateBracketWinners(db: Db, tournamentId: number) {
 
 export async function ensureTeamBracket(db: Db, tournamentId: number, opts: { force?: boolean; qualifiedPerGroup?: number } = {}) {
   const { force = false, qualifiedPerGroup = 2 } = opts
-  const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1)
+  // 병렬화: tournament + existingBracket + groupMatches + groupList 동시 조회 (4RTT → 1RTT)
+  const [tArr, existingBracket, groupMatches, groupList] = await Promise.all([
+    db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1),
+    db.select().from(matches).where(and(eq(matches.tournamentId, tournamentId), eq(matches.stage, 'bracket'))),
+    db.select().from(matches).where(and(eq(matches.tournamentId, tournamentId), eq(matches.stage, 'group'))).orderBy(asc(matches.id)),
+    db.select().from(groups).where(eq(groups.tournamentId, tournamentId)).orderBy(asc(groups.name)),
+  ])
+  const tournament = tArr[0]
   if (!tournament) return { created: false, reason: 'tournament-not-found' }
   if (tournament.matchType !== 'doubles' || tournament.doublesMode !== 'team') return { created: false, reason: 'not-team-mode' }
-  const existingBracket = await db.select().from(matches)
-    .where(and(eq(matches.tournamentId, tournamentId), eq(matches.stage, 'bracket')))
   const hasRealAssignment = existingBracket.some((m) => m.teamAId != null || m.teamBId != null || m.participant1Id != null)
   if (hasRealAssignment) return { created: false, reason: 'already-exists' }
-  const groupMatches = await db.select().from(matches)
-    .where(and(eq(matches.tournamentId, tournamentId), eq(matches.stage, 'group')))
-    .orderBy(asc(matches.id))
   if (groupMatches.length === 0) return { created: false, reason: 'no-group-matches' }
   if (!force && !groupMatches.every((m) => m.status === 'completed')) return { created: false, reason: 'group-not-finished' }
-  const groupList = await db.select().from(groups).where(eq(groups.tournamentId, tournamentId)).orderBy(asc(groups.name))
   // ── 최적화: 배정 1쿼리 + 팀 1쿼리 일괄 조회 (N+1 제거) ──
   const groupIds = groupList.map((g) => g.id)
   const allAssigns = groupIds.length

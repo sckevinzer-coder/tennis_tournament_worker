@@ -11,11 +11,15 @@ tournamentApi.post('/:id/generate-matches', async (c) => {
   const db = getDb(c.env.DB)
   const tournamentId = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
-  const groupList = await db.select().from(groups).where(eq(groups.tournamentId, tournamentId))
+  // 병렬화: groups + tournament 동시 조회 (2RTT → 1RTT)
+  const [groupList, tArr] = await Promise.all([
+    db.select().from(groups).where(eq(groups.tournamentId, tournamentId)),
+    db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1),
+  ])
+  const tournament = tArr[0]
   if (!groupList || groupList.length === 0) {
     return c.json({ message: '조 편성이 먼저 완료되어야 합니다. (POST /group-assignments/run)' }, 400)
   }
-  const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1)
   if (!tournament) return c.json({ message: 'Tournament not found' }, 404)
 
   // ── 최적화: 배정/참가자/팀을 3개 쿼리로 일괄 조회 (기존 N+1 제거) ──
