@@ -111,7 +111,33 @@ tournamentApi.post('/:id/generate-matches', async (c) => {
     gamesPerPlayer: matchType === 'doubles' && doublesMode === 'random' ? gamesPerPlayer : null,
     format, bracketPending: false,
     bracketPlaceholder: matchType === 'doubles' && doublesMode === 'team' && format !== 'league',
-    skippedGroups, matches: [],
+        skippedGroups, matches: [],
   }, 201)
+})
+
+// DELETE /:id/matches — 해당 대회의 모든 경기 삭제 (리셋) (운영자 전용, 벌크)
+// match_results는 matches 외래키 ON DELETE CASCADE로 자동 삭제됨
+tournamentApi.delete('/:id/matches', async (c) => {
+  if (c.get('role') !== 'organizer') {
+    return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  }
+  const db = getDb(c.env.DB)
+  const tournamentId = Number(c.req.param('id'))
+  if (!Number.isFinite(tournamentId) || tournamentId <= 0) {
+    return c.json({ message: '유효하지 않은 대회 ID' }, 400)
+  }
+  // 대회 존재 여부 확인
+  const tArr = await db.select({ id: tournaments.id })
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1)
+  if (!tArr[0]) return c.json({ message: 'Tournament not found' }, 404)
+
+  // 삭제 전 매치 수 확인 (프론트 total 반환용) → 일괄 삭제 (1쿼리)
+  const existing = await db.select({ id: matches.id })
+    .from(matches)
+    .where(eq(matches.tournamentId, tournamentId))
+  await db.delete(matches).where(eq(matches.tournamentId, tournamentId))
+  return c.json({ deleted: existing.length, total: existing.length, tournamentId })
 })
 
