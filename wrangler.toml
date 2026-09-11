@@ -1,0 +1,31 @@
+name = "tennis-tournament"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Static frontend assets
+[assets]
+directory = "./assets"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "tennis_db"
+database_id = "14e9c01c-a2ea-4227-ace1-6039fa3b94f6"
+migrations_dir = "migrations"
+
+# Durable Object for real-time match updates
+[[durable_objects.bindings]]
+name = "MATCH_REALTIME"
+class_name = "MatchRealtime"
+
+# Durable Object migrations (must be kept in sync with schema)
+[[migrations]]
+tag = "v2-realtime"
+new_sqlite_classes = ["MatchRealtime"]
+
+[vars]
+APP_NAME = "테니스 대회 관리"
+
+[observability]
+enabled = true
