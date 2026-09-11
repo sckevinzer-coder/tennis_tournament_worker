@@ -43,17 +43,21 @@ groupAssignmentApi.post('/run', async (c) => {
       }, 400)
     }
     const assigned = assignParticipantsToGroups(complete.map((x) => ({ id: x.id })), numGroups, mode)
-    for (const gi of assigned) {
-      const [g] = await db.insert(groups).values({
+    // ── 최적화: groups 멀티로우 삽입 후 returning으로 ID 확보 → assignments 멀티로우 삽입 (2N+1 → 2쿼리) ──
+    const insertedGroups = assigned.length
+      ? await db.insert(groups).values(assigned.map((gi) => ({
         tournamentId, name: gi.name, groupSize: gi.participants.length,
-      }).returning()
-      madeGroups.push(g)
-      for (const tm of gi.participants) {
-        const [a] = await db.insert(groupAssignments).values({
-          groupId: g.id, participantId: null, teamId: tm.id,
-        }).returning()
-        madeAssigns.push(a)
-      }
+      } as never))).returning()
+      : []
+    madeGroups.push(...insertedGroups)
+    const assignRows = assigned.flatMap((gi, idx) => {
+      const g = insertedGroups[idx]
+      if (!g) return []
+      return gi.participants.map((tm) => ({ groupId: g.id, participantId: null, teamId: tm.id }))
+    })
+    if (assignRows.length > 0) {
+      const insertedAssigns = await db.insert(groupAssignments).values(assignRows as never).returning()
+      madeAssigns.push(...insertedAssigns)
     }
     return c.json({
       groups: madeGroups, assignments: madeAssigns, unit: 'team',
@@ -67,17 +71,21 @@ groupAssignmentApi.post('/run', async (c) => {
   }
   const assigned = assignParticipantsToGroups(
     plist.map((p) => ({ id: p.id, seedRank: p.seedRank })), numGroups, mode)
-  for (const gi of assigned) {
-    const [g] = await db.insert(groups).values({
+  // ── 최적화: groups/assignments 멀티로우 삽입 (2N+1 → 2쿼리) ──
+  const insertedGroups = assigned.length
+    ? await db.insert(groups).values(assigned.map((gi) => ({
       tournamentId, name: gi.name, groupSize: gi.participants.length,
-    }).returning()
-    madeGroups.push(g)
-    for (const pm of gi.participants) {
-      const [a] = await db.insert(groupAssignments).values({
-        groupId: g.id, participantId: pm.id,
-      }).returning()
-      madeAssigns.push(a)
-    }
+    } as never))).returning()
+    : []
+  madeGroups.push(...insertedGroups)
+  const assignRows = assigned.flatMap((gi, idx) => {
+    const g = insertedGroups[idx]
+    if (!g) return []
+    return gi.participants.map((pm) => ({ groupId: g.id, participantId: pm.id }))
+  })
+  if (assignRows.length > 0) {
+    const insertedAssigns = await db.insert(groupAssignments).values(assignRows as never).returning()
+    madeAssigns.push(...insertedAssigns)
   }
   return c.json({ groups: madeGroups, assignments: madeAssigns, unit: 'participant' }, 201)
 })

@@ -1,5 +1,5 @@
 // 브래킷 서비스 — utils/bracketService.js 이전 (Drizzle 버전)
-import { eq, and, asc } from 'drizzle-orm'
+import { eq, and, asc, inArray } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { matches, teams, tournaments, groups, groupAssignments } from '../db/schema'
 import { computeTeamStandings } from './standingsTeam'
@@ -50,27 +50,31 @@ export async function propagateBracketWinners(db: Db, tournamentId: number) {
       m.winnerId = wid
     }
   }
-  const teamsById = new Map<number, { id: number; player1Id: number | null; player2Id: number | null }>()
-  const getTeam = async (id: number | null | undefined) => {
-    if (!id) return null
-    if (!teamsById.has(Number(id))) {
-      const [t] = await db.select().from(teams).where(eq(teams.id, Number(id))).limit(1)
-      if (t) teamsById.set(Number(id), { id: t.id, player1Id: t.player1Id, player2Id: t.player2Id })
-    }
-    return teamsById.get(Number(id)) || null
+  // ── 최적화: 참조된 팀을 1쿼리로 일괄 조회 (getTeam N+1 제거) ──
+  const referencedTeamIds = new Set<number>()
+  for (const m of all) {
+    if (m.teamAId != null) referencedTeamIds.add(Number(m.teamAId))
+    if (m.teamBId != null) referencedTeamIds.add(Number(m.teamBId))
   }
+  const teamRows = referencedTeamIds.size
+    ? await db.select().from(teams).where(inArray(teams.id, [...referencedTeamIds]))
+    : []
+  const teamsById = new Map(teamRows.map((t) => [t.id, { id: t.id, player1Id: t.player1Id, player2Id: t.player2Id }]))
+  const getTeam = (id: number | null | undefined) => (id ? teamsById.get(Number(id)) || null : null)
   let updated = 0
+  const updates: Promise<unknown>[] = []
   for (let r = 0; r < rounds.length - 1; r++) {
     const curList = rounds[r].list
     const nextList = rounds[r + 1].list
     for (let i = 0; i < nextList.length; i++) {
-      const freshA = (await db.select().from(matches).where(eq(matches.id, curList[2 * i]?.id ?? -1)).limit(1))[0]
-      const freshB = curList[2 * i + 1] ? (await db.select().from(matches).where(eq(matches.id, curList[2 * i + 1].id)).limit(1))[0] : null
-      const srcA = freshA || curList[2 * i]
-      const srcB = freshB || curList[2 * i + 1]
+      // 메모리 스냅샷 사용 (bye 갱신이 반영됨) — 매칭별 fresh SELECT 제거
+      const srcA = curList[2 * i]
+      const srcB = curList[2 * i + 1]
       if (!srcA) break
-      const wTeamA = srcA ? await getTeam(winningSide(srcA) === 'A' ? srcA.teamAId : winningSide(srcA) === 'B' ? srcA.teamBId : null) : null
-      const wTeamB = srcB ? await getTeam(winningSide(srcB) === 'A' ? srcB.teamAId : winningSide(srcB) === 'B' ? srcB.teamBId : null) : null
+      const sideA = winningSide(srcA)
+      const sideB = srcB ? winningSide(srcB) : null
+      const wTeamA = getTeam(sideA === 'A' ? srcA.teamAId : sideA === 'B' ? srcA.teamBId : null)
+      const wTeamB = srcB ? getTeam(sideB === 'A' ? srcB.teamAId : sideB === 'B' ? srcB.teamBId : null) : null
       const want = {
         teamAId: wTeamA?.id ?? null, teamBId: wTeamB?.id ?? null,
         participant1Id: wTeamA?.player1Id ?? null, participant3Id: wTeamA?.player2Id ?? null,
@@ -80,11 +84,12 @@ export async function propagateBracketWinners(db: Db, tournamentId: number) {
       const keys = ['teamAId', 'teamBId', 'participant1Id', 'participant3Id', 'participant2Id', 'participant4Id'] as const
       const changed = keys.some((k) => ((tgt[k] as number | null) ?? null) !== (want[k] ?? null))
       if (changed) {
-        await db.update(matches).set({ ...want, updatedAt: new Date().toISOString() }).where(eq(matches.id, tgt.id))
+        updates.push(db.update(matches).set({ ...want, updatedAt: new Date().toISOString() }).where(eq(matches.id, tgt.id)))
         updated++
       }
     }
   }
+  if (updates.length > 0) await Promise.all(updates)
   return { updated }
 }
 
@@ -103,14 +108,30 @@ export async function ensureTeamBracket(db: Db, tournamentId: number, opts: { fo
   if (groupMatches.length === 0) return { created: false, reason: 'no-group-matches' }
   if (!force && !groupMatches.every((m) => m.status === 'completed')) return { created: false, reason: 'group-not-finished' }
   const groupList = await db.select().from(groups).where(eq(groups.tournamentId, tournamentId)).orderBy(asc(groups.name))
+  // ── 최적화: 배정 1쿼리 + 팀 1쿼리 일괄 조회 (N+1 제거) ──
+  const groupIds = groupList.map((g) => g.id)
+  const allAssigns = groupIds.length
+    ? await db.select().from(groupAssignments).where(inArray(groupAssignments.groupId, groupIds))
+    : []
+  const assignsByGroup = new Map<number, typeof allAssigns>()
+  for (const a of allAssigns) {
+    const list = assignsByGroup.get(a.groupId) || []
+    list.push(a)
+    assignsByGroup.set(a.groupId, list)
+  }
+  const allTeamIds = [...new Set(allAssigns.map((a) => a.teamId).filter((v): v is number => v != null))]
+  const teamRows = allTeamIds.length
+    ? await db.select().from(teams).where(inArray(teams.id, allTeamIds))
+    : []
+  const teamsById = new Map(teamRows.map((t) => [t.id, t]))
   const groupStandings: { standing: ReturnType<typeof computeTeamStandings>; teamsInGroup: { id: number; name: string; player1Id: number | null; player2Id: number | null; seedRank: number | null }[] }[] = []
   for (const g of groupList) {
-    const assigns = await db.select().from(groupAssignments).where(eq(groupAssignments.groupId, g.id))
+    const assigns = assignsByGroup.get(g.id) || []
     const teamIds = assigns.map((a) => a.teamId).filter((v): v is number => v != null)
     if (teamIds.length === 0) continue
     const teamsInGroup: { id: number; name: string; player1Id: number | null; player2Id: number | null; seedRank: number | null }[] = []
     for (const tid of teamIds) {
-      const [t] = await db.select().from(teams).where(eq(teams.id, tid)).limit(1)
+      const t = teamsById.get(tid)
       if (t) teamsInGroup.push({ id: t.id, name: t.name, player1Id: t.player1Id, player2Id: t.player2Id, seedRank: (t as unknown as { seedRank?: number | null }).seedRank ?? null })
     }
     if (teamsInGroup.length === 0) continue
@@ -132,18 +153,20 @@ export async function ensureTeamBracket(db: Db, tournamentId: number, opts: { fo
     }
   }
   if (qualifiedTeams.length < 2) return { created: false, reason: 'not-enough-qualified-teams' }
+  // ── 최적화: 브래킷일괄 삭제 + batch 삽입 (N쿼리 → 2쿼리) ──
   if (existingBracket.length > 0) {
-    for (const m of existingBracket) await db.delete(matches).where(eq(matches.id, m.id))
+    await db.delete(matches).where(and(eq(matches.tournamentId, tournamentId), eq(matches.stage, 'bracket')))
   }
   const bracketMatches = generateTeamBracketMatches(qualifiedTeams)
-  for (const bm of bracketMatches) {
-    await db.insert(matches).values({
+  if (bracketMatches.length > 0) {
+    const stmts = bracketMatches.map((bm) => db.insert(matches).values({
       tournamentId,
       participant1Id: bm.participant1Id ?? null, participant2Id: bm.participant2Id ?? null,
       participant3Id: bm.participant3Id ?? null, participant4Id: bm.participant4Id ?? null,
       teamAId: bm.teamAId ?? null, teamBId: bm.teamBId ?? null,
       type: 'doubles', round: bm.round, stage: 'bracket', status: 'scheduled',
-    })
+    } as never))
+    await db.batch(stmts as unknown as [import('drizzle-orm/batch').BatchItem<'sqlite'>, ...import('drizzle-orm/batch').BatchItem<'sqlite'>[]])
   }
   await propagateBracketWinners(db, tournamentId)
   return { created: true, count: bracketMatches.length }
