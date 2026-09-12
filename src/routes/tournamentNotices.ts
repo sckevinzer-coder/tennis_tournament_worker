@@ -6,7 +6,7 @@ import { eq, desc } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { tournaments, notices } from '../db/schema'
 import { tournamentApi } from './tournaments'
-import { requireTournamentOwner } from '../lib/ownership'
+import { requireTournamentOwner, parseIdParam, sanitizeUserInput } from '../lib/ownership'
 
 // GET /tournaments/:id/notices — 목록
 tournamentApi.get('/:id/notices', async (c) => {
@@ -24,17 +24,19 @@ tournamentApi.get('/:id/notices', async (c) => {
 tournamentApi.post('/:id/notices', async (c) => {
   if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
-  const id = Number(c.req.param('id'))
-  if (!Number.isFinite(id) || id <= 0) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
+  const id = parseIdParam(c.req.param('id'))
+  if (!id) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
   // S-06: 본인 대회에만 공지 작성 가능 (IDOR 방지)
   const ownNotice = await requireTournamentOwner(db, c.get('userId'), id)
   if (!ownNotice.ok) return c.json({ message: ownNotice.message }, ownNotice.status)
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
-  if (!body.title || !String(body.title).trim()) return c.json({ message: 'title is required' }, 400)
+  const title = sanitizeUserInput(body.title != null ? String(body.title) : '', 200)
+  if (!title) return c.json({ message: 'title is required' }, 400)
+  const content = body.content != null ? sanitizeUserInput(String(body.content), 5000) : null
   const [n] = await db.insert(notices).values({
     tournamentId: id,
-    title: String(body.title).trim(),
-    content: body.content != null ? String(body.content) : null,
+    title,
+    content,
   } as never).returning()
   return c.json(n, 201)
 })

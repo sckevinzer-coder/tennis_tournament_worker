@@ -45,8 +45,31 @@ app.use('*', cors({
   credentials: true,
 }))
 
+// S-14: 요청 본문 크기 제한 (1MB) — DoS 방지
+app.use('*', async (c, next) => {
+  const cl = c.req.header('content-length')
+  if (cl && Number(cl) > 1_000_000) {
+    return c.json({ message: 'Request body too large (max 1MB)' }, 413)
+  }
+  await next()
+})
+
 // 모든 라우트에 선택 인증 적용 (Bearer 있으면 userId/role 저장)
 app.use('*', authOptional)
+
+// S-12: 보안 헤더 미들웨어 (HSTS, CSP, X-Frame-Options 등)
+app.use('*', async (c, next) => {
+  await next()
+  c.res.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  c.res.headers.set('X-Content-Type-Options', 'nosniff')
+  c.res.headers.set('X-Frame-Options', 'DENY')
+  c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  c.res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  c.res.headers.set(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://tennis-tournament.jplee.workers.dev; frame-ancestors 'none'"
+  )
+})
 
 app.get('/health', (c) => c.json({ ok: true, app: c.env.APP_NAME || 'tennis-worker' }))
 

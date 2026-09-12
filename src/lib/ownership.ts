@@ -1,6 +1,31 @@
-// 대회 소유자 검증 헬퍼 (S-06 IDOR 대응)
-// organizer A가 organizer B의 대회를 수정/삭제하지 못하도록
-// 요청자의 organizers.id와 tournaments.organizerId를 비교
+// S-15: 저장형 XSS 방지 — 사용자 입력 정규화 (서버측 1차 필터)
+// React가 기본 이스케이프하지만, 위험 패턴은 서버에서도 차단
+const DANGEROUS_PATTERNS = [
+  /<script[\s>]/i,
+  /javascript\s*:/i,
+  /on\w+\s*=/i,  // onclick, onerror 등
+  /<iframe[\s>]/i,
+  /<object[\s>]/i,
+  /<embed[\s>]/i,
+]
+
+export function sanitizeUserInput(input: string, maxLen = 500): string {
+  let s = input.trim()
+  if (s.length > maxLen) s = s.slice(0, maxLen)
+  // 위험 패턴이 포함되어 있으면 안전한 문자로 치환
+  for (const p of DANGEROUS_PATTERNS) {
+    s = s.replace(p, (m) => m.replace(/[<>]/g, ''))
+  }
+  return s
+}
+
+// S-16: ID 경계값 검증 헬퍼 — NaN/음수/초대형 숫자 차단
+export function parseIdParam(raw: string): number | null {
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0 || n > 2_147_483_647 || !Number.isInteger(n)) return null
+  return n
+}
+
 import { eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { tournaments, organizers } from '../db/schema'

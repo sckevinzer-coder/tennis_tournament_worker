@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { participants, matches, tournaments } from '../db/schema'
 import type { AppEnv } from '../middleware/auth'
+import { sanitizeUserInput } from '../lib/ownership'
 
 export const participantApi = new Hono<AppEnv>()
 
@@ -34,7 +35,8 @@ participantApi.get('/:id', async (c) => {
 participantApi.post('/', async (c) => {
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => null)
-  if (!body?.name || !String(body.name).trim()) {
+  const name = sanitizeUserInput(body?.name != null ? String(body.name) : '', 100)
+  if (!name) {
     return c.json({ message: 'name is required' }, 400)
   }
   if (!body.tournamentId) {
@@ -44,7 +46,7 @@ participantApi.post('/', async (c) => {
   if (!t) return c.json({ message: 'Tournament not found' }, 404)
 
   const [p] = await db.insert(participants).values({
-    name: String(body.name).trim(),
+    name,
     email: body.email ?? null,
     phone: body.phone ?? null,
     tournamentId: Number(body.tournamentId),
