@@ -19,13 +19,13 @@
 | S-09 | 비밀번호 정책 강화 (8자+) | P2 | 완료 | 8자 이상 + 72자 이하 제한 (curl 400/201 검증) |
 | S-10 | 로그인 rate limit | P2 | 완료 | IP당 10회/분, 초과 시 429 (curl 401→429 검증) |
 | S-11 | JWT TTL 단축 + 로그아웃 | P2 | 완료(단축) | 7일→24시간 (curl 24h 검증). 로그아웃 API는 미구현 |
-| S-12 | 보안 헤더 미들웨어 | P3 | 미조치 | HSTS/CSP/X-Frame 등 |
-| S-13 | 대량조회 페이징 | P3 | 미조치 | participants/matches 등 |
+| S-12 | 보안 헤더 미들웨어 | P3 | 완료 | HSTS/CSP/X-Frame-Options/nosniff/permissions-policy/referrer-policy (프로덕션 헤더 curl 검증) |
+| S-13 | 대량조회 페이징 | P3 | 부분 완료 | parsePagination(기본100·최대500)을 participants/tournaments/matches 목록에 적용. groups/teams/registration-requests/notices는 미적용 |
 | S-14 | 요청 본문 크기 제한 | P3 | 완료 | 1MB 제한, 초과 시 413 |
-| S-15 | 저장형 XSS 서버측 필터 | P3 | 완료 | sanitizeUserInput 적용 (공지·참가자 이름) |
+| S-15 | 저장형 XSS 서버측 필터 | P3 | 완료 | sanitizeUserInput 적용 (participants 이름·notices 제목/내용) |
 | S-16 | ID 경계값 검증 | P3 | 완료 | parseIdParam 헬퍼 (NaN/음수/초대형 차단) |
 | S-17 | WS 구독 범위 제한 | P3 | 미조치 | 대회별 참가자격 미검증 |
-| S-18 | 감사 로그 | P3 | 미조치 | 변경 이력 기록 없음 |
+| S-18 | 감사 로그 | P3 | 완료 | audit_logs 테이블(0004 migration 적용) + recordAudit 헬퍼 + tournaments/matches/participants/registrationRequests 라우트에 기록 (생성/수정/삭제/확인/승인) |
 
 ## 상세: S-06 소유자 검증 대상
 
