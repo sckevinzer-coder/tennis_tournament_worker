@@ -3,10 +3,13 @@
 import { users, organizers } from '../db/schema'
 
 const PBKDF2_ITERATIONS = 100_000
-const JWT_SECRET_DEFAULT = 'tennis-dev-secret-change-me'
 
+// JWT_SECRET이 반드시 설정되어야 합니다 (wrangler secret put JWT_SECRET)
 export function jwtSecret(env: Env): string {
-  return env.JWT_SECRET || JWT_SECRET_DEFAULT
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured. Run: wrangler secret put JWT_SECRET')
+  }
+  return env.JWT_SECRET
 }
 
 // ---- 비밀번호 해시 (PBKDF2) ----

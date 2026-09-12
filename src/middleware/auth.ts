@@ -1,6 +1,6 @@
 // Bearer JWT 인증 미들웨어 — 기존 tennis_tournament의 verifyBearer/requireOrganizer 대응
 import type { MiddlewareHandler } from 'hono'
-import { verifyJwt } from '../lib/auth'
+import { verifyJwt, jwtSecret } from '../lib/auth'
 
 export type AppEnv = {
   Bindings: Env
@@ -17,7 +17,7 @@ export const authOptional: MiddlewareHandler<AppEnv> = async (c, next) => {
   const auth = c.req.header('authorization') ?? ''
   const m = auth.match(/^Bearer\s+(.+)$/i)
   if (m) {
-    const payload = await verifyJwt(m[1], c.env.JWT_SECRET || 'tennis-dev-secret-change-me')
+    const payload = await verifyJwt(m[1], jwtSecret(c.env))
     if (payload) {
       c.set('userId', payload.sub)
       c.set('role', payload.role)

@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { users, organizers } from '../db/schema'
 import type { AppEnv } from '../middleware/auth'
-import { createUserWithOrganizer, verifyPassword, signJwt } from '../lib/auth'
+import { createUserWithOrganizer, verifyPassword, signJwt, jwtSecret } from '../lib/auth'
 
 export const authApi = new Hono<AppEnv>()
 
@@ -33,7 +33,7 @@ authApi.post('/register', async (c) => {
   }
 
   const user = await createUserWithOrganizer(db, { name, email, password, role })
-  const token = await signJwt({ sub: user.id, role: user.role }, c.env.JWT_SECRET || 'tennis-dev-secret-change-me')
+  const token = await signJwt({ sub: user.id, role: user.role }, jwtSecret(c.env))
   return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } }, 201)
 })
 
@@ -53,7 +53,7 @@ authApi.post('/login', async (c) => {
   const ok = await verifyPassword(password, user.passwordHash)
   if (!ok) return c.json({ message: '이메일 또는 비밀번호가 올바르지 않습니다' }, 401)
 
-  const token = await signJwt({ sub: user.id, role: user.role }, c.env.JWT_SECRET || 'tennis-dev-secret-change-me')
+  const token = await signJwt({ sub: user.id, role: user.role }, jwtSecret(c.env))
   return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } })
 })
 
