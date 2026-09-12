@@ -6,17 +6,21 @@ import { eq, desc } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { tournaments, notices } from '../db/schema'
 import { tournamentApi } from './tournaments'
-import { requireTournamentOwner, parseIdParam, sanitizeUserInput } from '../lib/ownership'
+import { requireTournamentOwner, parseIdParam, parsePagination, sanitizeUserInput } from '../lib/ownership'
 
 // GET /tournaments/:id/notices — 목록
 tournamentApi.get('/:id/notices', async (c) => {
   const db = getDb(c.env.DB)
-  const id = Number(c.req.param('id'))
+  const id = parseIdParam(c.req.param('id'))
+  if (!id) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
   const [t] = await db.select().from(tournaments).where(eq(tournaments.id, id)).limit(1)
   if (!t) return c.json({ message: 'Tournament not found' }, 404)
+  const { limit, offset } = parsePagination(c.req.query())
   const list = await db.select().from(notices)
     .where(eq(notices.tournamentId, id))
     .orderBy(desc(notices.createdAt))
+    .limit(limit)
+    .offset(offset)
   return c.json(list)
 })
 

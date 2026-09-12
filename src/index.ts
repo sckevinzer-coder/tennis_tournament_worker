@@ -2,6 +2,9 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
+import { eq, and } from 'drizzle-orm'
+import { getDb, type DB } from './db/client'
+import { organizers, participants, tournaments } from './db/schema'
 import { jwtSecret, verifyJwt } from './lib/auth'
 import type { AppEnv } from './middleware/auth'
 import { authOptional } from './middleware/auth'
@@ -118,12 +121,41 @@ async function handleWebSocketUpgrade(request: Request, env: any): Promise<Respo
     return new Response('Invalid or expired token', { status: 401 })
   }
 
+  // S-17: 구독 범위 제한 — 요청한 대회의 참가자 또는 소유 운영자만 구독 허용
   const tournamentId = Number(url.searchParams.get('tournamentId')) || 0
+  if (tournamentId > 0) {
+    const db = getDb(env.DB)
+    const allowed = await canAccessTournament(db, payload.sub, tournamentId)
+    if (!allowed) {
+      return new Response('Forbidden: not authorized to this tournament', { status: 403 })
+    }
+  }
+
   // DO의 fetch로 WebSocket 업그레이드 요청을 프록시
   // tournamentId가 없으면 기본 DO를 사용하고, 나중에 SUBSCRIBE 메시지로 구독
   const doId = env.MATCH_REALTIME.idFromName(String(tournamentId || 0))
   const stub = env.MATCH_REALTIME.get(doId)
   return stub.fetch(request)
+}
+
+// S-17: 특정 대회에 대한 구독 자격 판단 — 소유 운영자 또는 참가자면 true
+async function canAccessTournament(db: DB, userId: number, tournamentId: number): Promise<boolean> {
+  try {
+    // 사용자 본인의 운영자 레코드 조회
+    const [org] = await db.select().from(organizers).where(eq(organizers.userId, userId)).limit(1)
+    if (org) {
+      // 해당 대회의 소유 운영자면 허용
+      const [t] = await db.select().from(tournaments)
+        .where(and(eq(tournaments.id, tournamentId), eq(tournaments.organizerId, org.id))).limit(1)
+      if (t) return true
+    }
+    // 해당 대회의 참가자면 허용 (이메일 등 비직접 userId 매칭은 participants.userId 기준)
+    const [p] = await db.select().from(participants)
+      .where(and(eq(participants.tournamentId, tournamentId), eq(participants.userId, userId))).limit(1)
+    return !!p
+  } catch {
+    return false
+  }
 }
 
 export default {

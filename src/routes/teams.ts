@@ -4,19 +4,21 @@ import { Hono } from 'hono'
 import { and, eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { participants, teams, tournaments } from '../db/schema'
+import { parsePagination } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 
 export const teamApi = new Hono<AppEnv>()
 
-// GET /teams?tournamentId=X — 목록 (대회별 필터)
+// GET /teams?tournamentId=X&limit=N&offset=N — 목록 (대회별 필터)
 teamApi.get('/', async (c) => {
   const db = getDb(c.env.DB)
+  const { limit, offset } = parsePagination(c.req.query())
   const tournamentId = c.req.query('tournamentId')
   if (tournamentId) {
-    const list = await db.select().from(teams).where(eq(teams.tournamentId, Number(tournamentId)))
+    const list = await db.select().from(teams).where(eq(teams.tournamentId, Number(tournamentId))).limit(limit).offset(offset)
     return c.json(list)
   }
-  const list = await db.select().from(teams)
+  const list = await db.select().from(teams).limit(limit).offset(offset)
   return c.json(list)
 })
 

@@ -4,7 +4,7 @@ import { Hono } from 'hono'
 import { eq, and, asc } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { registrationRequests, tournaments, participants, teams } from '../db/schema'
-import { recordAudit } from '../lib/ownership'
+import { recordAudit, parsePagination } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 
 export const registrationRequestApi = new Hono<AppEnv>()
@@ -19,13 +19,14 @@ function parseNames(v: unknown): string[] {
   return []
 }
 
-// GET / — 목록 (?tournamentId=N)
+// GET / — 목록 (?tournamentId=N&limit=N&offset=N)
 registrationRequestApi.get('/', async (c) => {
   const db = getDb(c.env.DB)
+  const { limit, offset } = parsePagination(c.req.query())
   const tid = c.req.query('tournamentId')
   const list = tid
-    ? await db.select().from(registrationRequests).where(eq(registrationRequests.tournamentId, Number(tid))).orderBy(asc(registrationRequests.createdAt))
-    : await db.select().from(registrationRequests).orderBy(asc(registrationRequests.createdAt))
+    ? await db.select().from(registrationRequests).where(eq(registrationRequests.tournamentId, Number(tid))).orderBy(asc(registrationRequests.createdAt)).limit(limit).offset(offset)
+    : await db.select().from(registrationRequests).orderBy(asc(registrationRequests.createdAt)).limit(limit).offset(offset)
   return c.json(list)
 })
 
@@ -134,6 +135,7 @@ registrationRequestApi.post('/:id/reject', async (c) => {
   const [updated] = await db.update(registrationRequests).set({
     status: 'rejected', updatedAt: new Date().toISOString(),
   } as never).where(eq(registrationRequests.id, id)).returning()
+  recordAudit(db, c.get('userId'), 'registration.reject', 'registration', id, { participantName: request.participantName })
   return c.json(updated)
 })
 
@@ -145,6 +147,7 @@ registrationRequestApi.delete('/:id', async (c) => {
   const [request] = await db.select().from(registrationRequests).where(eq(registrationRequests.id, id)).limit(1)
   if (!request) return c.json({ message: 'Registration request not found' }, 404)
   await db.delete(registrationRequests).where(eq(registrationRequests.id, id))
+  recordAudit(db, c.get('userId'), 'registration.delete', 'registration', id, { participantName: request.participantName })
   return c.json({ message: 'Registration request deleted' })
 })
 

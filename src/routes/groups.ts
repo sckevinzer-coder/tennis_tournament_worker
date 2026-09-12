@@ -3,19 +3,21 @@ import { Hono } from 'hono'
 import { eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { groups, groupAssignments, participants, tournaments } from '../db/schema'
+import { parsePagination } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 
 export const groupApi = new Hono<AppEnv>()
 
-// GET /groups?tournamentId=X — 조 목록
+// GET /groups?tournamentId=X&limit=N&offset=N — 조 목록
 groupApi.get('/', async (c) => {
   const db = getDb(c.env.DB)
+  const { limit, offset } = parsePagination(c.req.query())
   const tournamentId = c.req.query('tournamentId')
   if (tournamentId) {
-    const list = await db.select().from(groups).where(eq(groups.tournamentId, Number(tournamentId)))
+    const list = await db.select().from(groups).where(eq(groups.tournamentId, Number(tournamentId))).limit(limit).offset(offset)
     return c.json(list)
   }
-  const list = await db.select().from(groups)
+  const list = await db.select().from(groups).limit(limit).offset(offset)
   return c.json(list)
 })
 
