@@ -21,6 +21,7 @@ rankingSnapshotApi.get('/:id', async (c) => {
 })
 
 rankingSnapshotApi.post('/', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401) // S-07
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
   if (!body.participantId || !body.tournamentId || body.rank == null) {
@@ -37,6 +38,7 @@ rankingSnapshotApi.post('/', async (c) => {
 })
 
 rankingSnapshotApi.put('/:id', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401) // S-07
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [r] = await db.select().from(rankingSnapshots).where(eq(rankingSnapshots.id, id)).limit(1)
@@ -53,6 +55,7 @@ rankingSnapshotApi.put('/:id', async (c) => {
 })
 
 rankingSnapshotApi.delete('/:id', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401) // S-07
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [r] = await db.select().from(rankingSnapshots).where(eq(rankingSnapshots.id, id)).limit(1)

@@ -11,8 +11,9 @@ export const groupAssignmentApi = new Hono<AppEnv>()
 
 const MODES = ['round_robin', 'random', 'seed', 'mixed']
 
-// POST /group-assignments/run — 조 편성 실행 (영속 저장, 재편성 지원)
+// POST /group-assignments/run — 조 편성 실행 (영속 저장, 재편성 지원, 운영자 전용 S-07)
 groupAssignmentApi.post('/run', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => null)
   const tournamentId = body?.tournamentId != null ? Number(body.tournamentId) : NaN

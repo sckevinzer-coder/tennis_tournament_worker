@@ -56,8 +56,9 @@ participantApi.post('/', async (c) => {
   return c.json(p, 201)
 })
 
-// PUT /participants/:id — 수정
+// PUT /participants/:id — 수정 (운영자 전용, S-07)
 participantApi.put('/:id', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [p] = await db.select().from(participants).where(eq(participants.id, id)).limit(1)
@@ -79,8 +80,9 @@ participantApi.put('/:id', async (c) => {
   return c.json(updated)
 })
 
-// DELETE /participants/:id — 삭제
+// DELETE /participants/:id — 삭제 (운영자 전용, S-07)
 participantApi.delete('/:id', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [p] = await db.select().from(participants).where(eq(participants.id, id)).limit(1)

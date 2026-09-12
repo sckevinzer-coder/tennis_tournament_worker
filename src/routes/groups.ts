@@ -28,8 +28,9 @@ groupApi.get('/:id', async (c) => {
   return c.json(g)
 })
 
-// POST /groups — 생성
+// POST /groups — 생성 (운영자 전용, S-07)
 groupApi.post('/', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => null)
   if (!body?.tournamentId || !body?.name) {
@@ -46,8 +47,9 @@ groupApi.post('/', async (c) => {
   return c.json(g, 201)
 })
 
-// PUT /groups/:id — 수정
+// PUT /groups/:id — 수정 (운영자 전용, S-07)
 groupApi.put('/:id', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [g] = await db.select().from(groups).where(eq(groups.id, id)).limit(1)
@@ -61,8 +63,9 @@ groupApi.put('/:id', async (c) => {
   return c.json(updated)
 })
 
-// DELETE /groups/:id — 삭제 (assignment는 FK cascade)
+// DELETE /groups/:id — 삭제 (assignment는 FK cascade, 운영자 전용 S-07)
 groupApi.delete('/:id', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [g] = await db.select().from(groups).where(eq(groups.id, id)).limit(1)

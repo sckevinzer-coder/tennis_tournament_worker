@@ -33,8 +33,9 @@ teamApi.get('/:id', async (c) => {
   return c.json({ ...t, members })
 })
 
-// POST /teams — 생성
+// POST /teams — 생성 (운영자 전용, S-07)
 teamApi.post('/', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => null)
   if (!body?.name || !String(body.name).trim()) {
@@ -70,8 +71,9 @@ teamApi.post('/', async (c) => {
   return c.json(team, 201)
 })
 
-// PUT /teams/:id — 수정
+// PUT /teams/:id — 수정 (운영자 전용, S-07)
 teamApi.put('/:id', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [t] = await db.select().from(teams).where(eq(teams.id, id)).limit(1)
@@ -87,8 +89,9 @@ teamApi.put('/:id', async (c) => {
   return c.json(updated)
 })
 
-// DELETE /teams/:id — 삭제
+// DELETE /teams/:id — 삭제 (운영자 전용, S-07)
 teamApi.delete('/:id', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [t] = await db.select().from(teams).where(eq(teams.id, id)).limit(1)

@@ -24,8 +24,9 @@ matchResultApi.get('/:id', async (c) => {
   return c.json(r)
 })
 
-// POST /match-results — 생성
+// POST /match-results — 생성 (운영자 전용, S-07)
 matchResultApi.post('/', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
   if (!body.matchId) return c.json({ message: 'matchId is required' }, 400)
@@ -42,8 +43,9 @@ matchResultApi.post('/', async (c) => {
   return c.json(r, 201)
 })
 
-// PUT /match-results/:id — 수정
+// PUT /match-results/:id — 수정 (운영자 전용, S-07)
 matchResultApi.put('/:id', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [r] = await db.select().from(matchResults).where(eq(matchResults.id, id)).limit(1)
@@ -60,8 +62,9 @@ matchResultApi.put('/:id', async (c) => {
   return c.json(updated)
 })
 
-// DELETE /match-results/:id — 삭제
+// DELETE /match-results/:id — 삭제 (운영자 전용, S-07)
 matchResultApi.delete('/:id', async (c) => {
+  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [r] = await db.select().from(matchResults).where(eq(matchResults.id, id)).limit(1)

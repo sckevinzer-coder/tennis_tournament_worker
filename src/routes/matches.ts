@@ -40,6 +40,11 @@ matchApi.put('/:id', async (c) => {
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
+  // S-08: submittedBy=organizer 변조 방지 — 운영자 경로는 토큰 role 검증 필수
+  if (body.submittedBy != null && String(body.submittedBy) === 'organizer'
+    && c.get('role') !== 'organizer') {
+    return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  }
   try {
     if (body.submittedBy) {
       const submittedBy = String(body.submittedBy)
