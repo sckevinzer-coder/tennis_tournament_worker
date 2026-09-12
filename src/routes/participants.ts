@@ -4,21 +4,22 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { participants, matches, tournaments } from '../db/schema'
 import type { AppEnv } from '../middleware/auth'
-import { sanitizeUserInput } from '../lib/ownership'
+import { sanitizeUserInput, parsePagination, recordAudit } from '../lib/ownership'
 
 export const participantApi = new Hono<AppEnv>()
 
 const PART_STATUS = ['registered', 'confirmed', 'eliminated', 'winner']
 
-// GET /participants?tournamentId=X — 목록 (대회별 필터)
+// GET /participants?tournamentId=X&limit=N&offset=N — 목록 (대회별 필터 + 페이징)
 participantApi.get('/', async (c) => {
   const db = getDb(c.env.DB)
+  const { limit, offset } = parsePagination(c.req.query())
   const tournamentId = c.req.query('tournamentId')
   if (tournamentId) {
-    const list = await db.select().from(participants).where(eq(participants.tournamentId, Number(tournamentId)))
+    const list = await db.select().from(participants).where(eq(participants.tournamentId, Number(tournamentId))).limit(limit).offset(offset)
     return c.json(list)
   }
-  const list = await db.select().from(participants)
+  const list = await db.select().from(participants).limit(limit).offset(offset)
   return c.json(list)
 })
 
@@ -55,6 +56,7 @@ participantApi.post('/', async (c) => {
     seedRank: body.seedRank ?? null,
     status: 'registered',
   }).returning()
+  recordAudit(db, c.get('userId'), 'participant.create', 'participant', p.id, { name: p.name, tournamentId: p.tournamentId })
   return c.json(p, 201)
 })
 
@@ -79,6 +81,7 @@ participantApi.put('/:id', async (c) => {
   if (body.totalScore !== undefined) patch.totalScore = Number(body.totalScore) || 0
 
   const [updated] = await db.update(participants).set(patch as never).where(eq(participants.id, id)).returning()
+  recordAudit(db, c.get('userId'), 'participant.update', 'participant', id, { name: updated.name, status: updated.status })
   return c.json(updated)
 })
 
@@ -90,6 +93,7 @@ participantApi.delete('/:id', async (c) => {
   const [p] = await db.select().from(participants).where(eq(participants.id, id)).limit(1)
   if (!p) return c.json({ message: 'Participant not found' }, 404)
   await db.delete(participants).where(eq(participants.id, id))
+  recordAudit(db, c.get('userId'), 'participant.delete', 'participant', id, undefined)
   return c.json({ message: 'Participant deleted' })
 })
 

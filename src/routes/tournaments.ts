@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { eq, desc } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { tournaments, organizers } from '../db/schema'
-import { requireTournamentOwner, parseIdParam } from '../lib/ownership'
+import { requireTournamentOwner, parseIdParam, parsePagination, recordAudit } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 
 export const tournamentApi = new Hono<AppEnv>()
@@ -102,6 +102,7 @@ tournamentApi.post('/', async (c) => {
   const [org] = await db.select().from(organizers).where(eq(organizers.userId, c.get('userId')!)).limit(1)
   if (org) payload.organizerId = org.id
   const [t] = await db.insert(tournaments).values(payload as never).returning()
+  recordAudit(db, c.get('userId'), 'tournament.create', 'tournament', t.id, { name: t.name })
   return c.json(parseTournament(t), 201)
 })
 
@@ -136,5 +137,6 @@ tournamentApi.delete('/:id', async (c) => {
   const ownDel = await requireTournamentOwner(db, c.get('userId'), id)
   if (!ownDel.ok) return c.json({ message: ownDel.message }, ownDel.status)
   await db.delete(tournaments).where(eq(tournaments.id, id))
+  recordAudit(db, c.get('userId'), 'tournament.delete', 'tournament', id, undefined)
   return c.json({ message: 'Tournament deleted' })
 })

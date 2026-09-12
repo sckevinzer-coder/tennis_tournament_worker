@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import { eq, and, asc } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { registrationRequests, tournaments, participants, teams } from '../db/schema'
+import { recordAudit } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 
 export const registrationRequestApi = new Hono<AppEnv>()
@@ -118,6 +119,7 @@ registrationRequestApi.post('/:id/approve', async (c) => {
     notes: request.notes ? `${request.notes} ${note}` : note,
     updatedAt: new Date().toISOString(),
   } as never).where(eq(registrationRequests.id, id)).returning()
+  recordAudit(db, c.get('userId'), 'registration.approve', 'registration', id, { participants: created.map((p) => p.id) })
   return c.json({ request: updated, participants: created })
 })
 

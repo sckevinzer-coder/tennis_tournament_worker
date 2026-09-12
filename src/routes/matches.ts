@@ -7,21 +7,24 @@ import { matches, matchResults } from '../db/schema'
 import { submitScore, confirmMatch, stringifySets } from '../lib/matchScore'
 import { onMatchCompleted } from '../lib/bracketService'
 import { publishMatchUpdate } from '../lib/realtime'
+import { recordAudit } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
+import { parsePagination } from '../lib/ownership'
 
 export const matchApi = new Hono<AppEnv>()
 
 const MATCH_STATUS = ['scheduled', 'in_progress', 'completed', 'confirmation_needed']
 
-// GET /matches?tournamentId=X — 목록
+// GET /matches?tournamentId=X&limit=N&offset=N — 목록
 matchApi.get('/', async (c) => {
   const db = getDb(c.env.DB)
+  const { limit, offset } = parsePagination(c.req.query())
   const tournamentId = c.req.query('tournamentId')
   if (tournamentId) {
-    const list = await db.select().from(matches).where(eq(matches.tournamentId, Number(tournamentId)))
+    const list = await db.select().from(matches).where(eq(matches.tournamentId, Number(tournamentId))).limit(limit).offset(offset)
     return c.json(list)
   }
-  const list = await db.select().from(matches)
+  const list = await db.select().from(matches).limit(limit).offset(offset)
   return c.json(list)
 })
 
@@ -80,6 +83,7 @@ matchApi.put('/:id', async (c) => {
       patch.court = cv || null
     }
     const [updated] = await db.update(matches).set(patch as never).where(eq(matches.id, id)).returning()
+    recordAudit(db, c.get('userId'), 'match.update', 'match', id, Object.keys(patch).reduce((acc, k) => ({ ...acc, [k]: updated[k as keyof typeof updated] }), {} as Record<string, unknown>))
     return c.json(updated)
   } catch (e) {
     const err = e as Error & { statusCode?: number }
@@ -104,6 +108,7 @@ matchApi.post('/:id/confirm', async (c) => {
       score1: m.score1, score2: m.score2, sets: m.sets,
       winnerId: m.winnerId, status: m.status,
     })
+    recordAudit(db, c.get('userId'), 'match.confirm', 'match', m.id, { winnerId: m.winnerId })
     return c.json(m)
   } catch (e) {
     const err = e as Error & { statusCode?: number }
@@ -132,6 +137,7 @@ matchApi.post('/', async (c) => {
     status: 'scheduled',
     court: body.court ? String(body.court) : null,
   } as never).returning()
+  recordAudit(db, c.get('userId'), 'match.create', 'match', m.id, { tournamentId: m.tournamentId, round: m.round, stage: m.stage })
   return c.json(m, 201)
 })
 
@@ -142,7 +148,9 @@ matchApi.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const [m] = await db.select().from(matches).where(eq(matches.id, id)).limit(1)
   if (!m) return c.json({ message: 'Match not found' }, 404)
+  const delResult = { matchId: id }
   await db.delete(matchResults).where(eq(matchResults.matchId, id))
   await db.delete(matches).where(eq(matches.id, id))
+  recordAudit(db, c.get('userId'), 'match.delete', 'match', id, delResult)
   return c.json({ message: 'Match deleted' })
 })

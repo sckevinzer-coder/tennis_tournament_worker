@@ -171,6 +171,18 @@ export const scoringRules = sqliteTable('scoring_rules', {
   updatedAt: text('updatedAt').notNull().default("datetime('now')"),
 })
 
+// S-18: 감사 로그 테이블
+// 주요 변경 작업(대회 생성/수정/삭제, 경기 확정, 참가 신청 승인/거절) 이력 기록
+export const auditLogs = sqliteTable('audit_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('userId'),
+  action: text('action').notNull(), // 'tournament.create', 'match.confirm', 'registration.approve' 등
+  targetType: text('targetType'), // 'tournament', 'match', 'participant', 'registration'
+  targetId: integer('targetId'),
+  detail: text('detail'), // JSON text (변경 내용 요약)
+  createdAt: text('createdAt').notNull().default("datetime('now')"),
+})
+
 export const rankingSnapshots = sqliteTable('ranking_snapshots', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   participantId: integer('participantId').notNull().references(() => participants.id, { onDelete: 'cascade' }),
