@@ -13,7 +13,7 @@
 | S-03 | WebSocket 인증 (/ws JWT 필수) | P1 | 완료 | 무토큰 401, 프론트 토큰가드 |
 | S-04 | 에러 메시지 은닉 | P2 | 완료 | onError generic 500 |
 | S-05 | 대회 생성 입력 검증 | P2 | 완료 | 화이트리스트 검증 |
-| S-06 | 대회 소유자 검증 (IDOR) | P0 | 미조치 | tournaments.ts PUT/DELETE + tournament 라우트 |
+| S-06 | 대회 소유자 검증 (IDOR) | P0 | 완료 | ownership.ts 헬퍼, 7개 엔드포인트 적용 + curl 검증(403/200) |
 | S-07 | 무인증 쓰기 API 인증 추가 | P0 | 미조치 | groups/teams/participants 등 |
 | S-08 | 스코어 입력 submittedBy 변조 방지 | P1 | 미조치 | matches.ts PUT |
 | S-09 | 비밀번호 정책 강화 (8자+) | P2 | 미조치 | auth.ts 현재 4자 |

@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { eq, desc } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { tournaments, organizers } from '../db/schema'
+import { requireTournamentOwner } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 
 export const tournamentApi = new Hono<AppEnv>()
@@ -108,8 +109,10 @@ tournamentApi.put('/:id', async (c) => {
   if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
-  const [t] = await db.select().from(tournaments).where(eq(tournaments.id, id)).limit(1)
-  if (!t) return c.json({ message: 'Tournament not found' }, 404)
+  if (!Number.isFinite(id) || id <= 0) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
+  // S-06: 본인 대회만 수정 가능 (IDOR 방지)
+  const own = await requireTournamentOwner(db, c.get('userId'), id)
+  if (!own.ok) return c.json({ message: own.message }, own.status)
   const body = await c.req.json().catch(() => ({}))
   let payload: Record<string, unknown>
   try {
@@ -127,8 +130,10 @@ tournamentApi.delete('/:id', async (c) => {
   if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
-  const [t] = await db.select().from(tournaments).where(eq(tournaments.id, id)).limit(1)
-  if (!t) return c.json({ message: 'Tournament not found' }, 404)
+  if (!Number.isFinite(id) || id <= 0) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
+  // S-06: 본인 대회만 삭제 가능 (IDOR 방지)
+  const ownDel = await requireTournamentOwner(db, c.get('userId'), id)
+  if (!ownDel.ok) return c.json({ message: ownDel.message }, ownDel.status)
   await db.delete(tournaments).where(eq(tournaments.id, id))
   return c.json({ message: 'Tournament deleted' })
 })

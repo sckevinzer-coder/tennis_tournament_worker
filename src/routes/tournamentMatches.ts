@@ -1,26 +1,29 @@
 // 경기 생성 파이프라인 — 기존 tournamentRoutes generate-matches 이전
 import { eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db/client'
-import { tournaments, groups, groupAssignments, participants, teams, matches } from '../db/schema'
+import { groups, groupAssignments, participants, teams, matches } from '../db/schema'
 import { generateAllMatches } from '../lib/generateAll'
 import { tournamentApi } from './tournaments'
+import { requireTournamentOwner } from '../lib/ownership'
 
 // POST /tournaments/:id/generate-matches — 조별 풀리그 + 본선 생성 (운영자 전용)
 tournamentApi.post('/:id/generate-matches', async (c) => {
   if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const tournamentId = Number(c.req.param('id'))
+  if (!Number.isFinite(tournamentId) || tournamentId <= 0) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
+  // S-06: 본인 대회만 매치 생성 가능 (IDOR 방지) — 존재 여부도 함께 확인
+  const ownGen = await requireTournamentOwner(db, c.get('userId'), tournamentId)
+  if (!ownGen.ok) return c.json({ message: ownGen.message }, ownGen.status)
+  const tournament = ownGen.tournament
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
-  // 병렬화: groups + tournament 동시 조회 (2RTT → 1RTT)
-  const [groupList, tArr] = await Promise.all([
+  // 병렬화: groups 조회 (tournament는 소유자 확인에서 이미 조회됨)
+  const [groupList] = await Promise.all([
     db.select().from(groups).where(eq(groups.tournamentId, tournamentId)),
-    db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1),
   ])
-  const tournament = tArr[0]
   if (!groupList || groupList.length === 0) {
     return c.json({ message: '조 편성이 먼저 완료되어야 합니다. (POST /group-assignments/run)' }, 400)
   }
-  if (!tournament) return c.json({ message: 'Tournament not found' }, 404)
 
   // ── 최적화: 배정/참가자/팀을 3개 쿼리로 일괄 조회 (기존 N+1 제거) ──
   const groupIds = groupList.map((g) => g.id)
@@ -126,12 +129,9 @@ tournamentApi.delete('/:id/matches', async (c) => {
   if (!Number.isFinite(tournamentId) || tournamentId <= 0) {
     return c.json({ message: '유효하지 않은 대회 ID' }, 400)
   }
-  // 대회 존재 여부 확인
-  const tArr = await db.select({ id: tournaments.id })
-    .from(tournaments)
-    .where(eq(tournaments.id, tournamentId))
-    .limit(1)
-  if (!tArr[0]) return c.json({ message: 'Tournament not found' }, 404)
+  // 대회 존재 여부 + 소유자 확인 (S-06 IDOR 방지)
+  const ownReset = await requireTournamentOwner(db, c.get('userId'), tournamentId)
+  if (!ownReset.ok) return c.json({ message: ownReset.message }, ownReset.status)
 
   // 삭제 전 매치 수 확인 (프론트 total 반환용) → 일괄 삭제 (1쿼리)
   const existing = await db.select({ id: matches.id })
