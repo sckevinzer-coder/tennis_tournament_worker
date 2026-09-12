@@ -23,8 +23,11 @@ authApi.post('/register', async (c) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return c.json({ message: '유효한 이메일이 필요합니다' }, 400)
   }
-  if (password.length < 4) {
-    return c.json({ message: '비밀번호는 4자 이상이어야 합니다' }, 400)
+  if (password.length < 8) {
+    return c.json({ message: '비밀번호는 8자 이상이어야 합니다' }, 400)
+  }
+  if (password.length > 72) {
+    return c.json({ message: '비밀번호는 72자 이하이어야 합니다' }, 400)
   }
 
   const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
@@ -38,7 +41,34 @@ authApi.post('/register', async (c) => {
 })
 
 // POST /login — { email, password } → { token, user }
+// S-10: 인메모리 rate limit — IP당 10회/분 초과 시 429
+const loginAttempts = new Map<string, { count: number; resetAt: number }>()
+
+function loginRateLimited(ip: string): { limited: boolean; retryAfter: number } {
+  const now = Date.now()
+  const WINDOW_MS = 60_000
+  const MAX_ATTEMPTS = 10
+  const entry = loginAttempts.get(ip)
+  if (!entry || now >= entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + WINDOW_MS })
+    return { limited: false, retryAfter: 0 }
+  }
+  entry.count += 1
+  if (entry.count > MAX_ATTEMPTS) {
+    return { limited: true, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
+  }
+  return { limited: false, retryAfter: 0 }
+}
+
 authApi.post('/login', async (c) => {
+  // S-10: 브루트포스 방어 — IP당 10회/분
+  const ip = c.req.header('cf-connecting-ip')
+    ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? 'unknown'
+  const rl = loginRateLimited(ip)
+  if (rl.limited) {
+    return c.json({ message: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.' }, 429, { 'Retry-After': String(rl.retryAfter) })
+  }
   const db = getDb(c.env.DB)
   const body = await c.req.json<{ email?: string; password?: string }>().catch(() => null)
   const email = String(body?.email ?? '').trim().toLowerCase()

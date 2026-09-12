@@ -44,6 +44,9 @@ export async function verifyPassword(password: string, stored: string): Promise<
 }
 
 // ---- JWT (HMAC-SHA256, 수동 서명) ----
+// S-11: 기본 TTL 24시간 (기존 7일에서 단축 — 토큰 탈취 시 노출 기간 축소)
+export const JWT_DEFAULT_TTL_SECONDS = 60 * 60 * 24
+
 function b64urlEncode(bytes: Uint8Array): string {
   let s = ''
   for (const b of bytes) s += String.fromCharCode(b)
@@ -58,7 +61,7 @@ function b64urlDecode(str: string): Uint8Array {
 
 export type JwtPayload = { sub: number; role: string; exp: number }
 
-export async function signJwt(payload: Omit<JwtPayload, 'exp'>, secret: string, ttlSeconds = 60 * 60 * 24 * 7): Promise<string> {
+export async function signJwt(payload: Omit<JwtPayload, 'exp'>, secret: string, ttlSeconds = JWT_DEFAULT_TTL_SECONDS): Promise<string> {
   const header = b64urlEncode(new TextEncoder().encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })))
   const body = b64urlEncode(new TextEncoder().encode(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + ttlSeconds })))
   const data = `${header}.${body}`
