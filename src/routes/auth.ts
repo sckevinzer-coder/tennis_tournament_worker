@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { users, organizers } from '../db/schema'
 import type { AppEnv } from '../middleware/auth'
-import { createUserWithOrganizer, verifyPassword, signJwt, jwtSecret } from '../lib/auth'
+import { createUserWithOrganizer, verifyPassword, hashPassword, signJwt, jwtSecret } from '../lib/auth'
 
 export const authApi = new Hono<AppEnv>()
 
@@ -96,4 +96,91 @@ authApi.get('/me', async (c) => {
   if (!user) return c.json({ message: 'User not found' }, 404)
   const [org] = await db.select().from(organizers).where(eq(organizers.userId, userId)).limit(1)
   return c.json({ id: user.id, name: user.name, email: user.email, role: user.role, organizer: org ? { id: org.id, orgName: org.orgName } : null })
+})
+
+// PUT /me — 내 정보(이름/이메일) 수정 — Bearer 필수
+authApi.put('/me', async (c) => {
+  const userId = c.get('userId')
+  if (!userId) return c.json({ message: '유효한 토큰이 필요합니다' }, 401)
+  const db = getDb(c.env.DB)
+  const body = await c.req.json<{ name?: string; email?: string }>().catch(() => null)
+  const name = String(body?.name ?? '').trim()
+  const email = String(body?.email ?? '').trim().toLowerCase()
+
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+  if (!user) return c.json({ message: 'User not found' }, 404)
+
+  const updates: Partial<typeof users.$inferInsert> = {}
+  if (name) {
+    if (name.length > 50) return c.json({ message: '이름은 50자 이하여야 합니다' }, 400)
+    updates.name = name
+  }
+  if (email && email !== user.email) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return c.json({ message: '유효한 이메일이 필요합니다' }, 400)
+    }
+    const dup = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
+    if (dup.length > 0) return c.json({ message: '이미 사용 중인 이메일입니다' }, 409)
+    updates.email = email
+  }
+  if (Object.keys(updates).length === 0) {
+    return c.json({ id: user.id, name: user.name, email: user.email, role: user.role })
+  }
+  const [updated] = await db.update(users).set(updates).where(eq(users.id, userId)).returning()
+  // 주최자면 조직명도 이름과 동기화 (초기 orgName이 가입자 이름과 동일한 경우만)
+  const [org] = await db.select().from(organizers).where(eq(organizers.userId, userId)).limit(1)
+  if (org && updates.name && org.orgName === user.name) {
+    await db.update(organizers).set({ orgName: updates.name }).where(eq(organizers.id, org.id))
+  }
+  return c.json({ id: updated.id, name: updated.name, email: updated.email, role: updated.role })
+})
+
+// PUT /me/password — 비밀번호 변경 — Bearer 필수, 현재 비밀번호 확인
+authApi.put('/me/password', async (c) => {
+  const userId = c.get('userId')
+  if (!userId) return c.json({ message: '유효한 토큰이 필요합니다' }, 401)
+  const db = getDb(c.env.DB)
+  const body = await c.req.json<{ currentPassword?: string; newPassword?: string }>().catch(() => null)
+  const currentPassword = String(body?.currentPassword ?? '')
+  const newPassword = String(body?.newPassword ?? '')
+
+  if (!currentPassword || !newPassword) {
+    return c.json({ message: 'currentPassword, newPassword are required' }, 400)
+  }
+  if (newPassword.length < 8) {
+    return c.json({ message: '비밀번호는 8자 이상이어야 합니다' }, 400)
+  }
+  if (newPassword.length > 72) {
+    return c.json({ message: '비밀번호는 72자 이하이어야 합니다' }, 400)
+  }
+
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+  if (!user) return c.json({ message: 'User not found' }, 404)
+
+  const ok = await verifyPassword(currentPassword, user.passwordHash)
+  if (!ok) return c.json({ message: '현재 비밀번호가 올바르지 않습니다' }, 401)
+
+  const passwordHash = await hashPassword(newPassword)
+  await db.update(users).set({ passwordHash }).where(eq(users.id, userId))
+  return c.json({ message: '비밀번호가 변경되었습니다' })
+})
+
+// DELETE /me — 회원탈퇴 — Bearer 필수, 비밀번호 재확인
+// 스키마: users 삭제 시 organizers cascade, tournaments.organizerId는 set null (대회는 무주공으로 유지)
+authApi.delete('/me', async (c) => {
+  const userId = c.get('userId')
+  if (!userId) return c.json({ message: '유효한 토큰이 필요합니다' }, 401)
+  const db = getDb(c.env.DB)
+  const body = await c.req.json<{ password?: string }>().catch(() => null)
+  const password = String(body?.password ?? '')
+  if (!password) return c.json({ message: '비밀번호 확인이 필요합니다' }, 400)
+
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+  if (!user) return c.json({ message: 'User not found' }, 404)
+
+  const ok = await verifyPassword(password, user.passwordHash)
+  if (!ok) return c.json({ message: '비밀번호가 올바르지 않습니다' }, 401)
+
+  await db.delete(users).where(eq(users.id, userId))
+  return c.json({ message: '회원탈퇴가 완료되었습니다' })
 })
