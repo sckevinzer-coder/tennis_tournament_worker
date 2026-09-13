@@ -52,6 +52,7 @@
 | scoringRules.ts | POST/PUT/DELETE /scoring-rules |
 | rankingSnapshots.ts | POST/PUT/DELETE /ranking-snapshots |
 | registrationRequests.ts | approve/reject/delete는 인증 있음 (POST 신청은 비회원 허용 → 유지) |
+| auth.ts | PUT /me·PUT /me/password·DELETE /me는 Bearer 필수 (2026-09-13 내정보 관리 추가). DELETE /me는 비밀번호 재확인, PUT /me/password는 현재 비밀번호 검증. 탈퇴 시 users 삭제 → organizers cascade · tournaments.organizerId set null (데이터 보존) |
 
 원칙: 쓰기(POST/PUT/DELETE)는 requireOrganizer 필수. 단, 참가신청 POST·참가자 POST는 비회원 플로우이므로 제외.
 
