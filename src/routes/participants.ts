@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { participants, matches, tournaments } from '../db/schema'
 import type { AppEnv } from '../middleware/auth'
-import { sanitizeUserInput, parsePagination, recordAudit } from '../lib/ownership'
+import { sanitizeUserInput, parsePagination, recordAudit, requireTournamentOwner } from '../lib/ownership'
 
 export const participantApi = new Hono<AppEnv>()
 
@@ -45,6 +45,9 @@ participantApi.post('/', async (c) => {
   }
   const [t] = await db.select({ id: tournaments.id }).from(tournaments).where(eq(tournaments.id, Number(body.tournamentId))).limit(1)
   if (!t) return c.json({ message: 'Tournament not found' }, 404)
+  // S-06: 대회 소유자만 직접 등록 가능 (IDOR 방지)
+  const own = await requireTournamentOwner(db, c.get('userId'), Number(body.tournamentId))
+  if (!own.ok) return c.json({ message: own.message }, own.status)
 
   const [p] = await db.insert(participants).values({
     name,
@@ -67,6 +70,9 @@ participantApi.put('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const [p] = await db.select().from(participants).where(eq(participants.id, id)).limit(1)
   if (!p) return c.json({ message: 'Participant not found' }, 404)
+  // S-06: 소속 대회 소유자만 수정 가능 (IDOR 방지)
+  const own = await requireTournamentOwner(db, c.get('userId'), p.tournamentId)
+  if (!own.ok) return c.json({ message: own.message }, own.status)
 
   const body = await c.req.json().catch(() => ({}))
   const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() }
@@ -92,6 +98,9 @@ participantApi.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const [p] = await db.select().from(participants).where(eq(participants.id, id)).limit(1)
   if (!p) return c.json({ message: 'Participant not found' }, 404)
+  // S-06: 소속 대회 소유자만 삭제 가능 (IDOR 방지)
+  const own = await requireTournamentOwner(db, c.get('userId'), p.tournamentId)
+  if (!own.ok) return c.json({ message: own.message }, own.status)
   await db.delete(participants).where(eq(participants.id, id))
   recordAudit(db, c.get('userId'), 'participant.delete', 'participant', id, undefined)
   return c.json({ message: 'Participant deleted' })
