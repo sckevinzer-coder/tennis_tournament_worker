@@ -648,3 +648,15 @@
     - 하단에 `👥 참가자 화면으로 돌아가기` 버튼
 - **잔여**: `browser_e2e.mjs`가 구 RoleSelect 플로우(운영자/참가자 카드 클릭) 전제 → 하단 네비 `🎭 운영자` 클릭 경로로 교체 필요 (후속 과제)
 - **배포**: worker version `a42718fa` · 번들 `index-oytfDPfF.js` · 프론트 `ae38fee`(master)
+
+## Step 15: P0 UI 폴리시 — 테니스 아이덴티티 + 카드 통일 (2026-09-19 완료)
+
+- [x] **15.1 아이덴티티 컬러 토큰** (`index.css` `:root`)
+    - `lime-400(테니스볼 #a3e635)` + `slate-900(네이비 #0f172a)` 2색 통일. 회색+파랑+인디고 혼용 해소
+- [x] **15.2 카드 시스템 통일** (`.card` / `.card-title` / `.card-body` / `.card-sub`)
+    - `AccountBar` 적용(`card` 클래스). 전 화면 점진 적용 예정
+- [x] **15.3 하단 탭 활성 인디케이터** (`BottomNav.jsx`)
+    - 파란 바 → 테니스볼 도트 + 활성 탭 살짝 상승(`-translate-y-0.5`) + 탭 눌림(`active:scale-95`)
+- [x] **15.4 빈 화면(Empty state)** (`.empty-wrap` 등 + `ParticipantTabs` 검색 결과 없음 적용)
+    - 🔍 일러스트 + 타이틀 + 안내 + 행동 버튼 규격
+- **배포**: worker version `49f6f99a` · 번들 `index-CcnMg5jG.js` · 프론트 `3173ff2`(master) / worker `895e30b`(main)
