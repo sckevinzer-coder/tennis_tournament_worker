@@ -660,3 +660,6 @@
 - [x] **15.4 빈 화면(Empty state)** (`.empty-wrap` 등 + `ParticipantTabs` 검색 결과 없음 적용)
     - 🔍 일러스트 + 타이틀 + 안내 + 행동 버튼 규격
 - **배포**: worker version `49f6f99a` · 번들 `index-CcnMg5jG.js` · 프론트 `3173ff2`(master) / worker `895e30b`(main)
+- [x] **15.5 전 화면 카드 `.card` 통일 후속** (2026-09-19)
+    - `ParticipantTabs.jsx` / `Dashboard.jsx` / `ParticipantHome.jsx`의 `bg-white rounded-2xl shadow-sm…` 잔여분을 `.card`로 일괄 교체 (sed, CLEAN 확인)
+    - **배포**: worker version `fc397df2` · 번들 `index-BtVcHtfg.js` · 프론트 `249df34`(master) / worker `f22b02d`(main)
