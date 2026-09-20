@@ -12,7 +12,7 @@ export const tournamentApi = new Hono<AppEnv>()
 tournamentApi.get('/', async (c) => {
   const db = getDb(c.env.DB)
   const list = await db.select().from(tournaments).orderBy(desc(tournaments.createdAt))
-  return c.json(list)
+  return c.json(list.map(parseTournament))
 })
 
 // GET /mine — 내(주최자) 대회 목록 (Bearer 필수)
@@ -27,10 +27,28 @@ tournamentApi.get('/mine', async (c) => {
   return c.json(list.map(parseTournament))
 })
 
-// courts JSON 문자열 → 배열 파싱 (프론트 호환)
+// courts JSON 문자열 → 배열 파싱 (프론트 호환, 이중 인코딩된 문자열도 처리)
 function parseTournament(t: any) {
   if (t && typeof t.courts === 'string') {
-    try { t.courts = JSON.parse(t.courts) } catch { t.courts = [] }
+    try {
+      // 1차 parse: 정상 JSON 배열이면 배열 반환
+      const parsed = JSON.parse(t.courts)
+      if (Array.isArray(parsed)) {
+        t.courts = parsed
+      } else if (typeof parsed === 'string') {
+        // 이중 인코딩("[\"1\",\"2\"]" → 파싱 결과 "\"1\",\"2\"" 같은 문자열)인 경우 재파싱
+        try {
+          const parsed2 = JSON.parse(parsed)
+          t.courts = Array.isArray(parsed2) ? parsed2 : [parsed]
+        } catch {
+          t.courts = [parsed]
+        }
+      } else {
+        t.courts = []
+      }
+    } catch {
+      t.courts = []
+    }
   }
   return t
 }
@@ -74,9 +92,20 @@ function normalizeTournamentBody(body: Record<string, unknown>) {
   if (body.location !== undefined) out.location = body.location ?? null
   if (body.entryFee !== undefined) out.entryFee = body.entryFee ?? null
   if (body.courts !== undefined) {
-    const arr = Array.isArray(body.courts)
-      ? body.courts.map((v) => String(v).trim()).filter(Boolean)
-      : String(body.courts ?? '').split(',').map((v) => v.trim()).filter(Boolean)
+    let arr: string[]
+    if (Array.isArray(body.courts)) {
+      arr = body.courts.map((v) => String(v).trim()).filter(Boolean)
+    } else {
+      const raw = String(body.courts ?? '')
+      // 이미 JSON 배열 문자열("[\"1\",\"2\"]") 형태로 들어온 경우 한 번 더 파싱 시도
+      let inner: unknown
+      try { inner = JSON.parse(raw) } catch { inner = null }
+      if (Array.isArray(inner)) {
+        arr = inner.map((v) => String(v).trim()).filter(Boolean)
+      } else {
+        arr = raw.split(',').map((v) => v.trim()).filter(Boolean)
+      }
+    }
     if (arr.length > 50) throw new Error('courts too many')
     out.courts = JSON.stringify(arr)
   }

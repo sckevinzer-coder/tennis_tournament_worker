@@ -663,3 +663,17 @@
 - [x] **15.5 전 화면 카드 `.card` 통일 후속** (2026-09-19)
     - `ParticipantTabs.jsx` / `Dashboard.jsx` / `ParticipantHome.jsx`의 `bg-white rounded-2xl shadow-sm…` 잔여분을 `.card`로 일괄 교체 (sed, CLEAN 확인)
     - **배포**: worker version `fc397df2` · 번들 `index-BtVcHtfg.js` · 프론트 `249df34`(master) / worker `f22b02d`(main)
+
+## Step 16: 코트 표시 버그 수정 — 이중 JSON 인코딩 (2026-09-20 완료)
+
+- [x] **16.1 증상**: 코트 선택 메뉴에서 `코트 ["1" / "2" / "3" / "4"]` 식으로 배열이 문자열 그대로 노출
+- [x] **16.2 원인**:
+    - `GET /tournaments` 목록 엔드포인트가 `parseTournament` 미적용 → DB의 JSON 문자열 그대로 반환
+    - 프론트 `courtList` 계산이 JSON 파싱 없이 `split(',')` → 대괄호/따옴표 섞여서 깨짐
+- [x] **16.3 수정**:
+    - Backend `src/routes/tournaments.ts`: 목록/단일/생성/수정 응답 전부 `parseTournament` 적용 + 이중 인코딩 2차 파싱 방어
+    - Frontend `Dashboard.jsx` `courtList`: 배열 → 1차 JSON.parse → 2차 JSON.parse(이중 인코딩) → 콤마 split 순서의 방어 로직
+- [x] **16.4 검증** (로컬 wrangler 8787):
+    - `GET /tournaments` → courts 타입 `list` (`['1','2']`) ✅
+    - `GET /tournaments/27` → courts 타입 `list` (`['1','2','3','4']`) ✅
+- **비고**: 프론트 vite dev 재시작 후 브라우저에서 코트 선택 메뉴 재확인 권장 (배포 전)
