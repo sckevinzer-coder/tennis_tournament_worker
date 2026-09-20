@@ -676,4 +676,8 @@
 - [x] **16.4 검증** (로컬 wrangler 8787):
     - `GET /tournaments` → courts 타입 `list` (`['1','2']`) ✅
     - `GET /tournaments/27` → courts 타입 `list` (`['1','2','3','4']`) ✅
-- **비고**: 프론트 vite dev 재시작 후 브라우저에서 코트 선택 메뉴 재확인 권장 (배포 전)
+- **브라우저 검증**: puppeteer + vite로 코트 탭 실측 → 옵션 `["미배정","코트 1","코트 2","코트 3","코트 4"]` 정상 렌더링 (7 pass / 0 fail)
+    - 추가 발견·수정: 방어 코드의 TS 문법(`let courtList: string[]`)이 .jsx에서 vite 파스 에러 → `let courtList`로 제거
+- **배포**: 프론트 빌드 `index-Btb_3vu3.js` → worker assets 복사 → worker version `2c49a1f5`
+    - 프로덕션 검증: `GET /tournaments` → courts 배열 반환 확인 (`id=2: ['a','b','c','d']`)
+    - git: worker `ccae5e6`(main) / 프론트 `8c23ac0`(master) push 완료
