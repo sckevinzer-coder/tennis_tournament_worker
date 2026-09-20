@@ -680,4 +680,16 @@
     - 추가 발견·수정: 방어 코드의 TS 문법(`let courtList: string[]`)이 .jsx에서 vite 파스 에러 → `let courtList`로 제거
 - **배포**: 프론트 빌드 `index-Btb_3vu3.js` → worker assets 복사 → worker version `2c49a1f5`
     - 프로덕션 검증: `GET /tournaments` → courts 배열 반환 확인 (`id=2: ['a','b','c','d']`)
+
+## Step 17: 참가자 "대회 코드로 입장" UI 제거 (2026-09-20 완료)
+
+- [x] **17.1 배경**: 참가자 입장은 대회명 검색으로 통일 — 코드 입력 폼은 혼란 유발 + 사실상 대회 ID 입력이었음
+- [x] **17.2 변경 (프론트 전용, 백엔드 무변경)**:
+    - `ParticipantTabs.jsx`: "대회 코드로 입장" `<details>` 블록 삭제, `code` 상태·`handleCodeEnter` 핸들러 제거, 검색 필터에서 `x.code` 매칭 제거(대회 ID 매칭은 유지), empty-state 문구 정리, placeholder → "대회명 또는 ID로 검색"
+    - `ParticipantHome.jsx`: subtitle "대회를 선택하거나 코드를 입력하세요." → "대회를 검색해서 입장하세요."
+    - `browser_e2e.mjs`: `enterByCode` → 검색 기반 입장(`입장하기` 버튼 클릭)으로 교체
+- [x] **17.3 브라우저 검증** (puppeteer + vite): **11 pass / 0 fail**
+    - 검색 UI 노출 / 코드 입장 UI 제거 / 검색(ID)→"입장하기" 버튼 노출 / "코드를 입력" 문구 제거 / 대회 선택·코트 옵션 회귀 전부 통과
+- **배포**: 프론트 빌드 `index-CvnGa5e6.js` → worker version `63edd89b`
+
     - git: worker `ccae5e6`(main) / 프론트 `8c23ac0`(master) push 완료
