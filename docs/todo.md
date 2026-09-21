@@ -733,3 +733,15 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - **검증**: vite build 통과 + 단위 검증 스크립트 7/7 OK (안내 문구·0패딩·포맷 3건·대진볼드·테이블full)
 - **E2E** (`browser_e2e.mjs`): 65 pass / 17 fail — 원복 상태(69/20)와 비교해 STEP 19 회귀 없음. 16개 공통 FAIL은 기존 실패(입장/조편성/대진표 일부), 4건 차이는 실행 타이밍 불안정(detached Frame)으로 [9] 모바일 섹션 미실행분
 - **배포**: 프론트 `6dbe997`(master) — 빌드 `index-D54LowUV.js` → worker version `a42718fa` (assets 수동 동기화 후 재배포, 프로덕션 번들 확인)
+
+## Step 20: UI 개선 2차 (2026-09-21 완료)
+
+- [x] **20-B 운영자 로딩 스피너 통일** — `Dashboard.jsx` 616행 `로딩 중...` 텍스트 → 참가자 화면과 동일한 스피너 (`role="status"` + `aria-label="로딩 중"` + lime 보더 + 안내 텍스트 유지)
+- [x] **20-C 승인 버튼 중복 방지** — `handleApproveRequest`에 `approvingRequestRef` 가드 (`handleAddParticipant` 패턴 재사용). 거절은 `confirm` 차단이므로 제외
+- [x] **20-D 매치 카드 터치 타겟** — `MatchCard.jsx` `▶️`→`▶️ 시작` 텍스트 병기 + `min-h-[44px]`, `🗑`에 `min-h/min-w-[44px]` + `aria-label`, `운영자 확정`도 44px. 터치 피드백 (`active:scale-95`) 추가
+- [x] **20-F 경기 탭 진행 요약** — `🎾 경기 (N개)` 아래에 `예정 N · LIVE N · 종료 N` (+ `확인필요 N` 조건부) 한 줄 추가
+- [x] **20-E 미배정 요약/필터** — 코트 탭 상단에 `미배정 N경기만 보기` 토글 버튼 (`aria-pressed`, 활성 시 amber 강조) + `courtUnassignedOnly` 상태로 목록 필터링. 미배정 0이면 버튼 미노출
+- [ ] **20-A 확인 모달** — 미진행. `window.confirm` 7곳 → 공통 `ConfirmDialog` 교체는 E2E `dialog` 핸들러 수정 동반이므로 별도 Step으로 분리
+- **검증**: vite build 통과 + 단위 검증 12/12 OK (Step 19 7건 + Step 20 5건)
+- **E2E** (`browser_e2e.mjs`): **65 pass / 17 fail** — Step 19 실행(65/17)과 동일한 수준, 회귀 없음. 공통 FAIL은 기존 실패
+- **배포**: 프론트 `e806717`(master) — 빌드 `index-K2blCODM.js` → worker version `49f6f99a` (assets 수동 동기화 후 재배포, 프로덕션 번들 확인)
