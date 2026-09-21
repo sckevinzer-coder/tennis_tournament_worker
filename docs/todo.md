@@ -697,12 +697,13 @@
 
 Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리한 결과. 우선순위 확정 후 진행 예정.
 
-- [ ] **18-A 참가자 "내경기" 탭 카드 정비** (최우선)
-    - 현재 `renderMatch`가 `라운드: 2 | 점수: 0 - 0 | 상태: in_progress` 형태의 텍스트 나열 + 임시 `border p-3 rounded` 스타일
-    - **문제 1**: 영어 상태값(`in_progress`/`scheduled`) 그대로 노출 → 운영자 `MatchCard.jsx`의 `STATUS_BADGE`(LIVE/예정/종료/확인필요) 패턴 재사용으로 한국어 배지화
-    - **문제 2**: `.card` 시스템 미적용 (Step 15 잔여분)
-    - **문제 3**: "내 경기"임을 직관적으로 표시하는 내 이름 하이라이트 없음
-    - **문제 4**: 완료 경기 점수 표시가 운영자 카드 대비 빈약 (세트 스코어/monospace 강조 가능)
+- [x] **18-A 참가자 "내경기" 탭 카드 정비** (2026-09-20 완료)
+    - `ParticipantHome.jsx` `renderMatch`: `.card` 적용 + 상태 배지(`STATUS_BADGE`: 예정/LIVE/종료/확인필요) + `내 경기` 배지 + 라운드·코트 배지 + 스코어 monospace
+    - 라운드 라벨 개선: `round_N` → `N라운드`, **`group_A` → `A조`**, qualifier/final/semifinal → 예선/결승/준결승
+    - 복식 경기 4인 라벨 지원 (`type === 'doubles'`), 완료 경기도 동일 카드로 통일(승자 표시 유지)
+    - `ScoreInput.jsx`: 상태 원문(영어 `scheduled`/`in_progress`…) 노출 제거 → 한국어 `statusLabel` (운영자·참가자 공용)
+    - **브라우저 검증** (puppeteer): **9 pass / 0 fail** — 영어 상태값 미노출 / 예정 배지 / 내 경기 배지 / `A조` 라벨 / `.card` 적용 / monospace 스코어
+    - **배포**: 프론트 빌드 `index-DhCVtDpo.js` → worker version `aacde128`
 - [ ] **18-B 참가자 입장 화면 대회 카드 정보 보강** (2순위)
     - 현재 대회 카드 = 이름 + #ID + 종류/형식 아이콘 2개뿐
     - **문제**: 날짜·참가자 수·진행 상태(draft/ongoing) 미표시 → 입장 전 판단 정보 부족
