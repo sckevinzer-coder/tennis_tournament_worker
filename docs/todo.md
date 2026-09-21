@@ -704,10 +704,13 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
     - `ScoreInput.jsx`: 상태 원문(영어 `scheduled`/`in_progress`…) 노출 제거 → 한국어 `statusLabel` (운영자·참가자 공용)
     - **브라우저 검증** (puppeteer): **9 pass / 0 fail** — 영어 상태값 미노출 / 예정 배지 / 내 경기 배지 / `A조` 라벨 / `.card` 적용 / monospace 스코어
     - **배포**: 프론트 빌드 `index-DhCVtDpo.js` → worker version `aacde128`
-- [ ] **18-B 참가자 입장 화면 대회 카드 정보 보강** (2순위)
-    - 현재 대회 카드 = 이름 + #ID + 종류/형식 아이콘 2개뿐
-    - **문제**: 날짜·참가자 수·진행 상태(draft/ongoing) 미표시 → 입장 전 판단 정보 부족
-    - 카드 스타일도 `bg-white rounded-xl shadow-sm border` 직접 조합 → `.card`로 교체
+- [x] **18-B 참가자 입장 화면 대회 카드 정보 보강** (2026-09-20 완료)
+    - `ParticipantTabs.jsx` `EnterScreen`: 카드 = `.card` + `.card-title` 로 교체 (기존 `bg-white rounded-xl shadow-sm border` 제거), 카드 전체가 클릭 영역(button)
+    - **추가 정보**: `📅 M/D` 날짜 배지 + **디데이 배지**(오늘=lime, 미래=`D-N` slate, 과거=`지난 대회` gray) + `정원 N명` 배지 + 기존 종류/형식 아이콘
+    - 신설 헬퍼: `formatDate()` / `ddayLabel()` (모듈 레벨, `startDate` 없으면 배지 생략)
+    - **브라우저 검증** (puppeteer): **8 pass / 0 fail** — 날짜 `9/24` / `D-3` / `지난 대회` / `정원 16명·8명` / `.card` 적용(6장) / 카드 클릭 입장 동작
+    - **배포**: 프론트 빌드 `index-DPb_1i56.js` → worker version `61c7cc21`
+    - **비고**: 문항 "진행 상태"는 대회 `status`가 실질적으로 `draft` 고정(프론트에서 미사용)이라 제외하고 **날짜·디데이·정원**으로 대체. 참가자 수는 목록 API에 없어 N+1 조회가 필요하므로 정원으로 갈음
 - [ ] **18-C 폴리시** (3순위, 소요 작음)
     - 로딩 표시: `Loading...` 텍스트 → 스피너/스켈레톤
     - "내 이름 선택" 칩: 현재 선택 이름 하이라이트 강조 (재방문 시 선택 상태 불명확)
