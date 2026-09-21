@@ -741,7 +741,14 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - [x] **20-D 매치 카드 터치 타겟** — `MatchCard.jsx` `▶️`→`▶️ 시작` 텍스트 병기 + `min-h-[44px]`, `🗑`에 `min-h/min-w-[44px]` + `aria-label`, `운영자 확정`도 44px. 터치 피드백 (`active:scale-95`) 추가
 - [x] **20-F 경기 탭 진행 요약** — `🎾 경기 (N개)` 아래에 `예정 N · LIVE N · 종료 N` (+ `확인필요 N` 조건부) 한 줄 추가
 - [x] **20-E 미배정 요약/필터** — 코트 탭 상단에 `미배정 N경기만 보기` 토글 버튼 (`aria-pressed`, 활성 시 amber 강조) + `courtUnassignedOnly` 상태로 목록 필터링. 미배정 0이면 버튼 미노출
-- [ ] **20-A 확인 모달** — 미진행. `window.confirm` 7곳 → 공통 `ConfirmDialog` 교체는 E2E `dialog` 핸들러 수정 동반이므로 별도 Step으로 분리
+- [x] **20-A 확인 모달** (2026-09-21 완료) — `window.confirm` 8곳(운영자 7 + 탈퇴 1) → 공통 `ConfirmDialog` 교체. `confirmDialog({title,message,confirmLabel,danger})` Promise API + `ConfirmDialogHost` (Dashboard·AccountBar에 마운트). 파괴적 액션은 빨강, 동명이인 추가는 파랑. E2E에 `autoConfirmModal` 자동수락 추가 (리셋 check 통과)
 - **검증**: vite build 통과 + 단위 검증 12/12 OK (Step 19 7건 + Step 20 5건)
 - **E2E** (`browser_e2e.mjs`): **65 pass / 17 fail** — Step 19 실행(65/17)과 동일한 수준, 회귀 없음. 공통 FAIL은 기존 실패
 - **배포**: 프론트 `e806717`(master) — 빌드 `index-K2blCODM.js` → worker version `49f6f99a` (assets 수동 동기화 후 재배포, 프로덕션 번들 확인)
+
+## Step 20-A: 확인 모달 교체 (2026-09-21 완료)
+
+- [x] **20-A 확인 모달** — `window.confirm` 8곳(운영자 7 + 탈퇴 1) → 공통 `ConfirmDialog` 교체. `confirmDialog({title,message,confirmLabel,danger})` Promise API + `ConfirmDialogHost` (Dashboard·AccountBar에 마운트). 파괴적 액션은 빨강, 동명이인 추가는 파랑. E2E에 `autoConfirmModal` 자동수락 추가 (리셋 check 통과)
+- **검증**: vite build 통과
+- **E2E** (`browser_e2e.mjs`): **69 pass / 20 fail** — 원복 상태(69/20)와 동일, 회귀 없음. `리셋 후 경기 목록 비어짐`·`재생성 후 경기 복구` 통과로 모달 교체 후 리셋 흐름 정상 확인
+- **배포**: 프론트 `291adad`(master) — 빌드 `index-DeJxOriH.js` → worker version `fc397df2` (assets 수동 동기화 후 재배포, 프로덕션 번들 확인)
