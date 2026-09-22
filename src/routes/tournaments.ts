@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { eq, desc } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { tournaments, organizers } from '../db/schema'
-import { requireTournamentOwner, parseIdParam, parsePagination, recordAudit } from '../lib/ownership'
+import { requireTournamentOwner, parseIdParam, parsePagination, recordAudit, hasOrganizerAccess } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 
 export const tournamentApi = new Hono<AppEnv>()
@@ -19,7 +19,7 @@ tournamentApi.get('/', async (c) => {
 tournamentApi.get('/mine', async (c) => {
   const userId = c.get('userId')
   if (!userId) return c.json({ message: '유효한 토큰이 필요합니다' }, 401)
-  if (c.get('role') !== 'organizer') return c.json([])
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json([])
   const db = getDb(c.env.DB)
   const [org] = await db.select().from(organizers).where(eq(organizers.userId, userId)).limit(1)
   if (!org) return c.json([])
@@ -114,7 +114,7 @@ function normalizeTournamentBody(body: Record<string, unknown>) {
 
 // POST / — 대회 생성 (운영자 전용, organizerId 자동 연결)
 tournamentApi.post('/', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => ({}))
   if (!body?.name || !String(body.name).trim()) {
@@ -137,12 +137,12 @@ tournamentApi.post('/', async (c) => {
 
 // PUT /:id — 대회 수정 (운영자 전용)
 tournamentApi.put('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = parseIdParam(c.req.param('id'))
   if (!id) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
-  // S-06: 본인 대회만 수정 가능 (IDOR 방지)
-  const own = await requireTournamentOwner(db, c.get('userId'), id)
+  // S-06: 본인 대회만 수정 가능 (IDOR 방지) — 최고관리자는 우회
+  const own = await requireTournamentOwner(db, c.env, c.get('userId'), id)
   if (!own.ok) return c.json({ message: own.message }, own.status)
   const body = await c.req.json().catch(() => ({}))
   let payload: Record<string, unknown>
@@ -158,12 +158,12 @@ tournamentApi.put('/:id', async (c) => {
 
 // DELETE /:id — 대회 삭제 (운영자 전용, FK CASCADE로 관련 데이터 함께 삭제)
 tournamentApi.delete('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = parseIdParam(c.req.param('id'))
   if (!id) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
-  // S-06: 본인 대회만 삭제 가능 (IDOR 방지)
-  const ownDel = await requireTournamentOwner(db, c.get('userId'), id)
+  // S-06: 본인 대회만 삭제 가능 (IDOR 방지) — 최고관리자는 우회
+  const ownDel = await requireTournamentOwner(db, c.env, c.get('userId'), id)
   if (!ownDel.ok) return c.json({ message: ownDel.message }, ownDel.status)
   await db.delete(tournaments).where(eq(tournaments.id, id))
   recordAudit(db, c.get('userId'), 'tournament.delete', 'tournament', id, undefined)

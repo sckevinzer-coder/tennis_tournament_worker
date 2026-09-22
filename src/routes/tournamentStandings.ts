@@ -6,7 +6,7 @@ import { ensureTeamBracket } from '../lib/bracketService'
 import { computeTeamStandings } from '../lib/standingsTeam'
 import { computeGroupStandings } from '../lib/standingsGroup'
 import { tournamentApi } from './tournaments'
-import { requireTournamentOwner, parseIdParam } from '../lib/ownership'
+import { requireTournamentOwner, parseIdParam, hasOrganizerAccess } from '../lib/ownership'
 
 // GET /tournaments/:id/standings — 조별 순위
 tournamentApi.get('/:id/standings', async (c) => {
@@ -78,12 +78,12 @@ tournamentApi.get('/:id/standings', async (c) => {
 
 // POST /tournaments/:id/generate-bracket — 본선 강제 생성 (운영자 전용)
 tournamentApi.post('/:id/generate-bracket', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const tournamentId = parseIdParam(c.req.param('id'))
   if (!tournamentId) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
-  // S-06: 본인 대회만 브래킷 생성 가능 (IDOR 방지)
-  const ownBracket = await requireTournamentOwner(db, c.get('userId'), tournamentId)
+  // S-06: 본인 대회만 브래킷 생성 가능 (IDOR 방지) — 최고관리자는 우회
+  const ownBracket = await requireTournamentOwner(db, c.env, c.get('userId'), tournamentId)
   if (!ownBracket.ok) return c.json({ message: ownBracket.message }, ownBracket.status)
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
   const res = await ensureTeamBracket(db, tournamentId, {

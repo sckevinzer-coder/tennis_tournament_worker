@@ -6,7 +6,7 @@ import { eq, desc } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { tournaments, notices } from '../db/schema'
 import { tournamentApi } from './tournaments'
-import { requireTournamentOwner, parseIdParam, parsePagination, sanitizeUserInput } from '../lib/ownership'
+import { requireTournamentOwner, parseIdParam, parsePagination, sanitizeUserInput, hasOrganizerAccess } from '../lib/ownership'
 
 // GET /tournaments/:id/notices — 목록
 tournamentApi.get('/:id/notices', async (c) => {
@@ -26,12 +26,12 @@ tournamentApi.get('/:id/notices', async (c) => {
 
 // POST /tournaments/:id/notices — 작성 (운영자)
 tournamentApi.post('/:id/notices', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = parseIdParam(c.req.param('id'))
   if (!id) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
-  // S-06: 본인 대회에만 공지 작성 가능 (IDOR 방지)
-  const ownNotice = await requireTournamentOwner(db, c.get('userId'), id)
+  // S-06: 본인 대회에만 공지 작성 가능 (IDOR 방지) — 최고관리자는 우회
+  const ownNotice = await requireTournamentOwner(db, c.env, c.get('userId'), id)
   if (!ownNotice.ok) return c.json({ message: ownNotice.message }, ownNotice.status)
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
   const title = sanitizeUserInput(body.title != null ? String(body.title) : '', 200)
@@ -47,13 +47,13 @@ tournamentApi.post('/:id/notices', async (c) => {
 
 // DELETE /tournaments/notices/:id — 삭제 (운영자, 원본 마운트 경로 유지)
 tournamentApi.delete('/notices/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [n] = await db.select().from(notices).where(eq(notices.id, id)).limit(1)
   if (!n) return c.json({ message: 'Notice not found' }, 404)
-  // S-06: 부모 대회의 소유자만 삭제 가능 (IDOR 방지)
-  const ownNoticeDel = await requireTournamentOwner(db, c.get('userId'), n.tournamentId)
+  // S-06: 부모 대회의 소유자만 삭제 가능 (IDOR 방지) — 최고관리자는 우회
+  const ownNoticeDel = await requireTournamentOwner(db, c.env, c.get('userId'), n.tournamentId)
   if (!ownNoticeDel.ok) return c.json({ message: ownNoticeDel.message }, ownNoticeDel.status)
   await db.delete(notices).where(eq(notices.id, id))
   return c.json({ message: 'Notice deleted' })

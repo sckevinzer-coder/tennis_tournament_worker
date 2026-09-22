@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { matchResults } from '../db/schema'
 import type { AppEnv } from '../middleware/auth'
+import { hasOrganizerAccess } from '../lib/ownership'
 
 export const matchResultApi = new Hono<AppEnv>()
 
@@ -26,7 +27,7 @@ matchResultApi.get('/:id', async (c) => {
 
 // POST /match-results — 생성 (운영자 전용, S-07)
 matchResultApi.post('/', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
   if (!body.matchId) return c.json({ message: 'matchId is required' }, 400)
@@ -45,7 +46,7 @@ matchResultApi.post('/', async (c) => {
 
 // PUT /match-results/:id — 수정 (운영자 전용, S-07)
 matchResultApi.put('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [r] = await db.select().from(matchResults).where(eq(matchResults.id, id)).limit(1)
@@ -64,7 +65,7 @@ matchResultApi.put('/:id', async (c) => {
 
 // DELETE /match-results/:id — 삭제 (운영자 전용, S-07)
 matchResultApi.delete('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [r] = await db.select().from(matchResults).where(eq(matchResults.id, id)).limit(1)

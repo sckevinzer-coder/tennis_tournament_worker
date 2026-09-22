@@ -4,7 +4,7 @@ import { Hono } from 'hono'
 import { and, eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { participants, teams, tournaments } from '../db/schema'
-import { parsePagination } from '../lib/ownership'
+import { parsePagination, hasOrganizerAccess } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 
 export const teamApi = new Hono<AppEnv>()
@@ -37,7 +37,7 @@ teamApi.get('/:id', async (c) => {
 
 // POST /teams — 생성 (운영자 전용, S-07)
 teamApi.post('/', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => null)
   if (!body?.name || !String(body.name).trim()) {
@@ -75,7 +75,7 @@ teamApi.post('/', async (c) => {
 
 // PUT /teams/:id — 수정 (운영자 전용, S-07)
 teamApi.put('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [t] = await db.select().from(teams).where(eq(teams.id, id)).limit(1)
@@ -93,7 +93,7 @@ teamApi.put('/:id', async (c) => {
 
 // DELETE /teams/:id — 삭제 (운영자 전용, S-07)
 teamApi.delete('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [t] = await db.select().from(teams).where(eq(teams.id, id)).limit(1)

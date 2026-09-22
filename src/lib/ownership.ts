@@ -45,17 +45,45 @@ export function parseIdParam(raw: string): number | null {
   return n
 }
 
+// 최고관리자 판별 — Secret SUPERADMIN_IDS (콤마 구분 user id, 예: "1,5")
+// wrangler.toml에 두지 않고 Cloudflare 대시보드/secret으로만 관리
+export function isSuperAdmin(env: { SUPERADMIN_IDS?: string }, userId: number | null | undefined): boolean {
+  if (userId == null) return false
+  const raw = String(env.SUPERADMIN_IDS ?? '').trim()
+  if (!raw) return false
+  const ids = new Set(raw.split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0))
+  return ids.has(userId)
+}
+
+// 운영자 권한(역할) — 최고관리자는 role과 무관하게 통과
+export function hasOrganizerAccess(
+  env: { SUPERADMIN_IDS?: string },
+  userId: number | null | undefined,
+  role: string | null | undefined,
+): boolean {
+  return role === 'organizer' || isSuperAdmin(env, userId)
+}
+
 export type OwnerCheck =
   | { ok: true; orgId: number; tournament: Tournament }
   | { ok: false; status: 403 | 404; message: string }
 
 export async function requireTournamentOwner(
   db: Db,
+  env: { SUPERADMIN_IDS?: string },
   userId: number | null | undefined,
   tournamentId: number,
 ): Promise<OwnerCheck> {
   if (userId == null) {
     return { ok: false, status: 403, message: '대회 소유자 권한이 필요합니다' }
+  }
+  // 최고관리자는 소유권 체크 우회 (삭제 포함 전체 관리 가능)
+  if (isSuperAdmin(env, userId)) {
+    const [t] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1)
+    if (!t) {
+      return { ok: false, status: 404, message: 'Tournament not found' }
+    }
+    return { ok: true, orgId: t.organizerId ?? 0, tournament: t }
   }
   const [org] = await db.select().from(organizers).where(eq(organizers.userId, userId)).limit(1)
   if (!org) {

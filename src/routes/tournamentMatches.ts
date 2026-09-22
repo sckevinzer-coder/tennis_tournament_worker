@@ -4,16 +4,16 @@ import { getDb } from '../db/client'
 import { groups, groupAssignments, participants, teams, matches } from '../db/schema'
 import { generateAllMatches } from '../lib/generateAll'
 import { tournamentApi } from './tournaments'
-import { requireTournamentOwner, parseIdParam } from '../lib/ownership'
+import { requireTournamentOwner, parseIdParam, hasOrganizerAccess } from '../lib/ownership'
 
 // POST /tournaments/:id/generate-matches — 조별 풀리그 + 본선 생성 (운영자 전용)
 tournamentApi.post('/:id/generate-matches', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const tournamentId = parseIdParam(c.req.param('id'))
   if (!tournamentId) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
-  // S-06: 본인 대회만 매치 생성 가능 (IDOR 방지) — 존재 여부도 함께 확인
-  const ownGen = await requireTournamentOwner(db, c.get('userId'), tournamentId)
+  // S-06: 본인 대회만 매치 생성 가능 (IDOR 방지) — 존재 여부도 함께 확인 — 최고관리자는 우회
+  const ownGen = await requireTournamentOwner(db, c.env, c.get('userId'), tournamentId)
   if (!ownGen.ok) return c.json({ message: ownGen.message }, ownGen.status)
   const tournament = ownGen.tournament
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
@@ -121,14 +121,14 @@ tournamentApi.post('/:id/generate-matches', async (c) => {
 // DELETE /:id/matches — 해당 대회의 모든 경기 삭제 (리셋) (운영자 전용, 벌크)
 // match_results는 matches 외래키 ON DELETE CASCADE로 자동 삭제됨
 tournamentApi.delete('/:id/matches', async (c) => {
-  if (c.get('role') !== 'organizer') {
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) {
     return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   }
   const db = getDb(c.env.DB)
   const tournamentId = parseIdParam(c.req.param('id'))
   if (!tournamentId) return c.json({ message: '유효하지 않은 대회 ID' }, 400)
-  // 대회 존재 여부 + 소유자 확인 (S-06 IDOR 방지)
-  const ownReset = await requireTournamentOwner(db, c.get('userId'), tournamentId)
+  // 대회 존재 여부 + 소유자 확인 (S-06 IDOR 방지) — 최고관리자는 우회
+  const ownReset = await requireTournamentOwner(db, c.env, c.get('userId'), tournamentId)
   if (!ownReset.ok) return c.json({ message: ownReset.message }, ownReset.status)
 
   // 삭제 전 매치 수 확인 (프론트 total 반환용) → 일괄 삭제 (1쿼리)

@@ -5,6 +5,7 @@ import { getDb } from '../db/client'
 import { users, organizers } from '../db/schema'
 import type { AppEnv } from '../middleware/auth'
 import { createUserWithOrganizer, verifyPassword, hashPassword, signJwt, jwtSecret } from '../lib/auth'
+import { isSuperAdmin } from '../lib/ownership'
 
 export const authApi = new Hono<AppEnv>()
 
@@ -37,7 +38,8 @@ authApi.post('/register', async (c) => {
 
   const user = await createUserWithOrganizer(db, { name, email, password, role })
   const token = await signJwt({ sub: user.id, role: user.role }, jwtSecret(c.env))
-  return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } }, 201)
+  // 최고관리자 여부는 Secret SUPERADMIN_IDS 기준 — 프론트 배지/관리 탭 노출용
+  return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, isSuperAdmin: isSuperAdmin(c.env, user.id) } }, 201)
 })
 
 // POST /login — { email, password } → { token, user }
@@ -84,7 +86,8 @@ authApi.post('/login', async (c) => {
   if (!ok) return c.json({ message: '이메일 또는 비밀번호가 올바르지 않습니다' }, 401)
 
   const token = await signJwt({ sub: user.id, role: user.role }, jwtSecret(c.env))
-  return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } })
+  // 최고관리자 여부는 Secret SUPERADMIN_IDS 기준 — 프론트 배지/관리 탭 노출용
+  return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, isSuperAdmin: isSuperAdmin(c.env, user.id) } })
 })
 
 // GET /me — Bearer 필수
@@ -95,7 +98,7 @@ authApi.get('/me', async (c) => {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
   if (!user) return c.json({ message: 'User not found' }, 404)
   const [org] = await db.select().from(organizers).where(eq(organizers.userId, userId)).limit(1)
-  return c.json({ id: user.id, name: user.name, email: user.email, role: user.role, organizer: org ? { id: org.id, orgName: org.orgName } : null })
+  return c.json({ id: user.id, name: user.name, email: user.email, role: user.role, isSuperAdmin: isSuperAdmin(c.env, user.id), organizer: org ? { id: org.id, orgName: org.orgName } : null })
 })
 
 // PUT /me — 내 정보(이름/이메일) 수정 — Bearer 필수

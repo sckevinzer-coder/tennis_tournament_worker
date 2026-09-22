@@ -4,10 +4,11 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { groups, groupAssignments } from '../db/schema'
 import { groupAssignmentApi } from './groupAssignments'
+import { hasOrganizerAccess } from '../lib/ownership'
 
 // POST /group-assignments — 수동 배정 생성 (운영자 전용, S-07)
 groupAssignmentApi.post('/', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => null)
   if (!body?.groupId) return c.json({ message: 'groupId is required' }, 400)
@@ -23,7 +24,7 @@ groupAssignmentApi.post('/', async (c) => {
 
 // PUT /group-assignments/:id — 배정 수정 (운영자 전용, S-07)
 groupAssignmentApi.put('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [a] = await db.select().from(groupAssignments).where(eq(groupAssignments.id, id)).limit(1)
@@ -39,7 +40,7 @@ groupAssignmentApi.put('/:id', async (c) => {
 
 // DELETE /group-assignments/:id — 배정 삭제 (운영자 전용, S-07)
 groupAssignmentApi.delete('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [a] = await db.select().from(groupAssignments).where(eq(groupAssignments.id, id)).limit(1)

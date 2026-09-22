@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { scoringRules } from '../db/schema'
 import type { AppEnv } from '../middleware/auth'
+import { hasOrganizerAccess } from '../lib/ownership'
 
 export const scoringRuleApi = new Hono<AppEnv>()
 
@@ -21,7 +22,7 @@ scoringRuleApi.get('/:id', async (c) => {
 })
 
 scoringRuleApi.post('/', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401) // S-07
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401) // S-07
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
   const [r] = await db.insert(scoringRules).values({
@@ -39,7 +40,7 @@ scoringRuleApi.post('/', async (c) => {
 })
 
 scoringRuleApi.put('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401) // S-07
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401) // S-07
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [r] = await db.select().from(scoringRules).where(eq(scoringRules.id, id)).limit(1)
@@ -59,7 +60,7 @@ scoringRuleApi.put('/:id', async (c) => {
 })
 
 scoringRuleApi.delete('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401) // S-07
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401) // S-07
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [r] = await db.select().from(scoringRules).where(eq(scoringRules.id, id)).limit(1)

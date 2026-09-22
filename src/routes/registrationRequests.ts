@@ -4,7 +4,7 @@ import { Hono } from 'hono'
 import { eq, and, asc } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import { registrationRequests, tournaments, participants, teams } from '../db/schema'
-import { recordAudit, parsePagination, requireTournamentOwner } from '../lib/ownership'
+import { recordAudit, parsePagination, requireTournamentOwner, hasOrganizerAccess } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 
 export const registrationRequestApi = new Hono<AppEnv>()
@@ -70,7 +70,7 @@ registrationRequestApi.post('/', async (c) => {
 // POST /registration-requests/:id/approve — 승인 (운영자 전용)
 // Participant(+복식 팀 페어 Team) 자동 생성 후 approved
 registrationRequestApi.post('/:id/approve', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const request = (await db.select().from(registrationRequests).where(eq(registrationRequests.id, id)).limit(1))[0]
@@ -78,8 +78,8 @@ registrationRequestApi.post('/:id/approve', async (c) => {
   if (request.status === 'approved') return c.json({ message: '이미 승인된 신청입니다.' }, 400)
   const tournament = (await db.select().from(tournaments).where(eq(tournaments.id, request.tournamentId)).limit(1))[0]
   if (!tournament) return c.json({ message: 'Tournament not found' }, 404)
-  // S-06: 대회 소유자(또는 관리자)만 신청 승인 가능 (IDOR 방지)
-  const own = await requireTournamentOwner(db, c.get('userId'), request.tournamentId)
+  // S-06: 대회 소유자(또는 관리자)만 신청 승인 가능 (IDOR 방지) — 최고관리자는 우회
+  const own = await requireTournamentOwner(db, c.env, c.get('userId'), request.tournamentId)
   if (!own.ok) return c.json({ message: own.message }, own.status)
   const names = parseNames(request.memberNames)
   const finalNames = names.length > 0 ? names : [request.participantName]
@@ -129,14 +129,14 @@ registrationRequestApi.post('/:id/approve', async (c) => {
 
 // POST /registration-requests/:id/reject — 거절 (운영자 전용, 재신청 가능)
 registrationRequestApi.post('/:id/reject', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [request] = await db.select().from(registrationRequests).where(eq(registrationRequests.id, id)).limit(1)
   if (!request) return c.json({ message: 'Registration request not found' }, 404)
   if (request.status === 'approved') return c.json({ message: '이미 승인된 신청은 거절할 수 없습니다.' }, 400)
-  // S-06: 대회 소유자만 신청 거절 가능 (IDOR 방지)
-  const own = await requireTournamentOwner(db, c.get('userId'), request.tournamentId)
+  // S-06: 대회 소유자만 신청 거절 가능 (IDOR 방지) — 최고관리자는 우회
+  const own = await requireTournamentOwner(db, c.env, c.get('userId'), request.tournamentId)
   if (!own.ok) return c.json({ message: own.message }, own.status)
   const [updated] = await db.update(registrationRequests).set({
     status: 'rejected', updatedAt: new Date().toISOString(),
@@ -147,13 +147,13 @@ registrationRequestApi.post('/:id/reject', async (c) => {
 
 // DELETE /registration-requests/:id — 삭제 (운영자 전용)
 registrationRequestApi.delete('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [request] = await db.select().from(registrationRequests).where(eq(registrationRequests.id, id)).limit(1)
   if (!request) return c.json({ message: 'Registration request not found' }, 404)
-  // S-06: 대회 소유자만 신청 삭제 가능 (IDOR 방지)
-  const own = await requireTournamentOwner(db, c.get('userId'), request.tournamentId)
+  // S-06: 대회 소유자만 신청 삭제 가능 (IDOR 방지) — 최고관리자는 우회
+  const own = await requireTournamentOwner(db, c.env, c.get('userId'), request.tournamentId)
   if (!own.ok) return c.json({ message: own.message }, own.status)
   await db.delete(registrationRequests).where(eq(registrationRequests.id, id))
   recordAudit(db, c.get('userId'), 'registration.delete', 'registration', id, { participantName: request.participantName })

@@ -7,7 +7,7 @@ import { matches, matchResults } from '../db/schema'
 import { submitScore, confirmMatch, stringifySets } from '../lib/matchScore'
 import { onMatchCompleted } from '../lib/bracketService'
 import { publishMatchUpdate } from '../lib/realtime'
-import { recordAudit } from '../lib/ownership'
+import { recordAudit, hasOrganizerAccess } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 import { parsePagination } from '../lib/ownership'
 
@@ -45,7 +45,7 @@ matchApi.put('/:id', async (c) => {
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
   // S-08: submittedBy=organizer 변조 방지 — 운영자 경로는 토큰 role 검증 필수
   if (body.submittedBy != null && String(body.submittedBy) === 'organizer'
-    && c.get('role') !== 'organizer') {
+    && !hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) {
     return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   }
   try {
@@ -94,7 +94,7 @@ matchApi.put('/:id', async (c) => {
 
 // POST /matches/:id/confirm — 운영자 최종 확정 (확인필요 해소)
 matchApi.post('/:id/confirm', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
@@ -119,7 +119,7 @@ matchApi.post('/:id/confirm', async (c) => {
 
 // POST /matches — 수동 경기 생성 (운영자 전용)
 matchApi.post('/', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
   if (!body.tournamentId || !body.round) return c.json({ message: 'tournamentId and round are required' }, 400)
@@ -143,7 +143,7 @@ matchApi.post('/', async (c) => {
 
 // DELETE /matches/:id — 경기 삭제 (운영자 전용, 관련 MatchResult 함께 삭제)
 matchApi.delete('/:id', async (c) => {
-  if (c.get('role') !== 'organizer') return c.json({ message: '운영자 인증이 필요합니다' }, 401)
+  if (!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))) return c.json({ message: '운영자 인증이 필요합니다' }, 401)
   const db = getDb(c.env.DB)
   const id = Number(c.req.param('id'))
   const [m] = await db.select().from(matches).where(eq(matches.id, id)).limit(1)
