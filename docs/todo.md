@@ -794,3 +794,25 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - 설정 후 즉시 반영(재배포 불필요). 확인: 로그인 후 `GET /auth/me`의 `isSuperAdmin`, 또는 운영 화면 계정 바의 `🛡 최고관리자` 배지
 - **user id 찾기**: `npx wrangler d1 execute tennis_db --remote --json --command "select id,name,email,role from users order by id"`
 - 참고: 운영 DB 기준 후보 — id 6 `sckevinzer@naver.com`(organizer), id 15 `sckevinzer@gmail.com`(user)
+
+## Step 22: 짧은 로그인 ID + 비밀번호 재설정 (2026-09-21 완료)
+
+**목표**: 이메일 형식(@)이 아닌 짧은 ID(`chris` 등)로 가입·로그인 가능 + 비밀번호를 잊었을 때 화면에서 스스로 재설정.
+
+### 구현
+- worker `src/routes/auth.ts`: `normalizeLoginId()` 신설
+  - `@` 포함 → 기존 이메일 규칙 유지 (소문자 정규화, 도메인 형식 강제)
+  - `@` 미포함 → 2~32자 영숫자/`._-` 허용 (원래 입력 그대로 저장)
+- 적용: `/register`·`/login`·`PUT /me`(수정) — 응답 `email` 필드 그대로 사용(하위 호환)
+- `POST /auth/reset-password` 신설 — 이름+식별자 일치 시 즉시 재설정 (Bearer 불필요, PBKDF2 해시만 저장)
+- 프론트 `AccountBar.jsx`: 식별자 입력 `type="text"` + `이메일 또는 ID` 안내, 로그인 탭에 "재설정하기" 링크 + 재설정 폼(amber)
+- 프론트 `api/auth.js`: `resetPassword({name, email, newPassword})` 추가
+
+### 검증
+- worker `tsc --noEmit` 통과, 프론트 vite build 통과
+- `scripts/loginid_check.mjs` **12 pass / 0 fail** — 짧은 ID 가입/로그인, 재설정→새 비번 로그인/구 비번 거부, 이름 불일치 404, 깨진 입력 400, 한 글자 ID 거부, 이메일 회귀(소문자·대문자·중복)
+- E2E 회귀 (`browser_e2e.mjs`): **72 pass / 17 fail** — 기존 실패 목록과 동일, 신규 회귀 없음
+
+### 배포
+- worker `a629bd4`+assets동기화(main), 프론트 `527773b`(master)
+- 프론트 빌드 `index-CdX-EljG.js` → 프로덕션 번들 확인
