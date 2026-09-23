@@ -249,7 +249,7 @@
 | ✅ **4. 운영자 UI(Step 4)** | 생성폼·참가자등록·조편성·네비 | `npm run build` 통과 + ScoreInput/Bracket 통합 | ✅ 완료(headless Chrome E2E 26/26) |
 | ✅ **5. 참가자 UI(Step 5)** | 코드입장·스코어·트리 브래킷 | build 경고 없음 + 47/47 회귀 | ✅ 완료(헤드리스 브라우저 코드입장→내경기 검증) |
 | ✅ **6. MVP 통합 검증(Step 6)** | 전체 시나리오 | E2E 스크립트 24/24 + socket E2E 3/3 + 47 jest | ✅ 완료(헤드리스 브라우저 대회생성→조편→대진표 검증) |
-| 🔲 **7. 모바일 UI(Step 7)** | 반응형·하단탭·역할선택 | `npm run build` + headless Chrome 375px 검증 | ✅ 완료(26/26, 뷰포트 375 탭 전환 검증) |
+| ✅ **7. 모바일 UI(Step 7)** | 반응형·하단탭·역할선택 | `npm run build` + headless Chrome 375px 검증 | ✅ 완료(26/26, 뷰포트 375 탭 전환 검증 — 2026-09-23 표기 수정: `🔲`는 오탐) |
 | ✅ **8. UI/UX 리팩터링 + 추가 기능(Step 8)** | bye 버그·스코어 직접 입력·타이브레이크 설정·경기 알림·Toast/그룹핑 polish·회원가입·복식(수동) | 백엔드 Jest **59/59** + 브라우저 E2E **48/48** | ✅ 완료(2026-08-25, 자동 복식 편성만 추후) |
 
 **실행 순서:** Step0 → Step2 → Step3 → Step4 → Step5 → Step6 (각 단계 종료 시 해당 기능 테스트 실행·통과 후 다음). 최종 Step6에서 전체(E2E)를 재확인.
@@ -377,18 +377,19 @@
         - [x] `browser_e2e.mjs` [3a]: `select[aria-label=...]` 2드롭다운 방식 → `input[aria-label="팀원 검색"]` fill→후보 클릭 방식으로 대응 (puppeteer `page.fill` 미지원 → elementHandle triple-click+Backspace)
         - [x] 검증: vite build ✓ · E2E **58/58** (팀 결성 완료·팀 자동 이름 '·' 표시 모두 pass)
 
-- [ ] **8.6d 조별 순위표 시각화 (2026-08-29 결정, 구현 예정)**
+- [x] **8.6d 조별 순위표 시각화 (2026-08-29 결정)** — **현황(2026-09-23 코드 재검증)**: 하위 항목 백엔드/API/프론트 4건은 구현 완료(체크 누락 → 기록 갱신). **잔여 1건**: E2E의 진출(상위 2) 강조 표시 확인 미포함. (`?unit=` 쿼리 명시 지정만 미구현 — 자동 선택은 동작)
     - **배경**: 조별 리그(예선)에서 경기 목록이 아닌 **조별 순위표(승패·득실·순위)**가 직관적.
-    - [ ] **백엔드**: `standings.js`에 `computeGroupStandings()` 구현 — 단식 조별 리그의 개인 순위(승/패/세트득실) 집계. 이미 `computeTeamStandings`(복식 팀) 존재.
-    - [ ] **API**: `GET /tournaments/:id/standings?unit=auto|team|player` — `unit` 미지정 시 대회 `matchType`/`doublesMode`에 자동 선택.
-    - [ ] **프론트 `TournamentBracket.jsx`**: 조 선택 UI + 조별 순위표 모드 추가. 표시: 순위 | 대상(선수/팀) | 승 | 패 | 득실 | 진출 여부. 진출 팀은 초록색 강조.
-    - [ ] **프론트 `Dashboard.jsx`**: 대진표 탭에서 `standings` 조회·상태 관리, 조 선택 핸들러.
-    - [ ] **기능테스트**: `browser_e2e.mjs`에 "조 선택 시 순위표 렌더 + 진출자 강조" 시나리오 추가.
+    - **백엔드**: ✅ — 단 `standings.js` 대신 `src/lib/standingsGroup.ts`로 구현(리팩터링 시 이전). `computeTeamStandings`(`lib/standingsTeam`)도 공존.
+    - **API**: ✅ — `GET /tournaments/:id/standings`가 대회 `matchType`/`doublesMode`에 따라 `unit: 'team'`/`'participant'` 자동 선택(`routes/tournamentStandings.ts`). 단, 쿼리스트링 `?unit=` 명시 지정 파라미터는 미구현(자동 선택만 동작 — 실사용상 문제 없음).
+    - **프론트 `TournamentBracket.jsx`**: ✅ — "조 선택 UI"는 **12.1의 예선 조 카드 그리드(클릭 → 조 상세 화면)** 방식으로 대체 구현. 조 상세에 `StandingsTable`(순위·승·패·게임득실, **조당 상위 2 강조**·하위 흐림 = 진출 강조 역할) 포함.
+    - **프론트 `Dashboard.jsx`**: ✅ — standings 상태(`standings` state + `{unit, groups}` 평탄화, L55·L643) 및 조회·표시 구현.
+    - [ ] **기능테스트**: "조 카드 클릭 → 조 상세 순위표 렌더(게임득실 포함)" E2E는 있으나(`browser_e2e.mjs` 12.1 체크)**진출(상위 2) 강조 표시 확인은 미포함** — 잔여 1건.
 - [x] **8.6d 조별 순위표 & 대진표 예선/본선 통합 표시** — 예선 조별 라운드에 조 내 팀 승패·게임득실·순위표(📊) 표시. 프론트 `Dashboard.jsx`에 standings useEffect 추가, `TournamentBracket.jsx`에 `StandingsTable` 컴포넌트, 백엔드 `standings.js`에 `computeGroupStandings()`, `GET /tournaments/:id/standings` API. 브래킷은 예선+본선이 한 화면에 컬럼으로 나란히 표시.
     - [x] 기능테스트: `browser_e2e.mjs` [7] 대진표 단계에 순위표 확인 추가 → **58/58 통과**
     - **트레이드오프**: 조별 리그가 아닌 본선 브래킷에서는 기존 MatchNode 트리 그대로 유지 (모드 분기만 추가).
         - [x] E2E: `스코어 규칙 설정 UI 노출` + `타이브레이크 5-5 설정 적용` ✅ (**48/48 전체 통과**, 백엔드 Jest 59/59)
-- [ ] **8.7 배포 전 보안 점검 (Phase 1-5 확장)** — env 변수/JWT_SECRET/REQUIRE_ORGANIZER_AUTH=✅, CORS-Helmet, passwordHash 유출 방지, `/tournaments/:id/standings` 인증 미들웨어(verifyBearer) 추가. 자세한 내용은 `docs/SECURITY.md` 참조.
+- [x] **8.7 배포 전 보안 점검 (Phase 1-5 확장)** — env 변수/JWT_SECRET(`JWT_SECRET` secret 등록 확인)/REQUIRE_ORGANIZER_AUTH=✅, CORS **허용 오리진 화이트리스트 구현 완료**(`ALLOWED_ORIGINS`: localhost:5173 + tennis-tournament.jplee.workers.dev, 미허용 origin 거부), Helmet, passwordHash 유출 방지, `docs/SECURITY.md` 정리 ✅.
+    - [ ] 잔여: `/tournaments/:id/standings`에 verifyBearer 미적용 — 현재 **공개 조회(미인증 허용)** 로 의도된 동작. 브라우저 전환 없이 API만으로 순위 조회 가능한 상태로 둘지 별도 검토 필요 (2026-09-23 코드 확인).
 
 - [x] **8.8 UI/UX 마무리 polish** (누적 대기 중인 화면 미세 개선 — 전 항목 완료)
     - [x] **편성 완료 시 → '경기' 탭 자동 전환** (`handleGroupAssignment` 성공 시 `setActiveTab('matches')`)
@@ -467,10 +468,10 @@
     - [x] **라이브 검증**: `/` 200(text/html, React 앱 로딩) · `/tournaments` 200(JSON) · Socket.IO **WSS 연결 OK**
     - [x] 프론트 `.env`를 공개 URL(`VITE_API_BASE_URL`/`VITE_SOCKET_URL` = https://tennistournament-production.up.railway.app)로 교체 → 재빌드·커밋 (앱/웹 모두 이 URL 사용)
     - [x] **Cleartext/ATS 예외 제거 → HTTPS 전용 확정**: Android `usesCleartextTraffic="false"`, iOS `NSAllowsArbitraryLoads` 제거 (스토어 정책 준수)
-- [ ] **10.6 앱 아이콘·스플래시·스토어 메타데이터** — `@capacitor/assets` 또는 네이티브 리소스로 아이콘/스플래시 교체(현재 기본 Capacitor 아이콘), 앱 이름·패키지 확인, 스토어 설명·스크린샷·개인정보처리방침 준비
-- [ ] **10.7 네이티브 빌드 검증** — Android Studio(`npm run android`)로 APK/AAB 빌드, Xcode(`npm run ios`)로 Archive → TestFlight/Play Console 내부테스트 배포
-    - ⚠️ **로컬 환경 블로커**: 현재 `gradle`/`ANDROID_HOME`/Android Studio/Xcode 미설치 → 사용자 설치 후 진행 필요
-- [x] **10.8 CORS/Socket 프로덕션 점검** — 라이브 서버에서 `cors()` 전체 허용 동작(네이티브 WebView origin 접근 가능) 확인 + **Socket.IO WSS 실측 연결 성공**(`socket.io-client`로 https URL websocket transport 검증). ⚠️ 운영 확대 시 허용 오리진 명시로 강화 권장
+- [ ] **10.6 앱 아이콘·스플래시·스토어 메타데이터** — `@capacitor/assets` 또는 네이티브 리소스로 아이콘/스플래시 교체(현재 기본 Capacitor 아이콘), 앱 이름·패키지 확인, 스토어 설명·스크린샷·개인정보처리방침 준비 — **보류 유지** (2026-09-23 재확인: `@capacitor` 미설치·`manifest.webmanifest` 없음 → Step 10 미착수 상태와 동일)
+- [ ] **10.7 네이티브 빌드 검증** — Android Studio(`npm run android`)로 APK/AAB 빌드, Xcode(`npm run ios`)로 Archive → TestFlight/Play Console 내부테스트 배포 — **보류 유지**
+    - ⚠️ **로컬 환경 블로커**: 현재 `gradle`/`ANDROID_HOME`/Android Studio/Xcode 미설치 → 사용자 설치 후 진행 필요 (2026-09-23 재확인: `android/`·`ios/` 네이티브 프로젝트 폴더 자체도 없음)
+- [x] **10.8 CORS/Socket 프로덕션 점검** — 라이브 서버에서 `cors()` 전체 허용 동작(네이티브 WebView origin 접근 가능) 확인 + **Socket.IO WSS 실측 연결 성공**(`socket.io-client`로 https URL websocket transport 검증). ~~허용 오리진 명시로 강화 권장~~ → **강화 완료**: worker `src/index.ts`에 `ALLOWED_ORIGINS` 화이트리스트(localhost:5173 + tennis-tournament.jplee.workers.dev) 구현 — 미허용 origin은 `null` 반환으로 거부 (2026-09-23 확인)
 
 **실행 순서:** 10.1~10.4(로컬 구성, 완료) → 10.5(✅ Railway 배포 완료) → 10.8(✅ WSS/CORS 점검 완료) → 10.6(아이콘/메타) → 10.7(네이티브 빌드, Android Studio/Xcode 필요)
 **현재(2026-08-29):** **10.1~10.5 + 10.8 완료 — 라이브 서버 가동 중.** 백엔드(API+WSS)+프론트 정적 서빙이 `https://tennistournament-production.up.railway.app`에서 동작하며, 앱은 빌드 시 이 URL을 사용. **잔여: 10.6(스토어 메타)·10.7(로컬에 Android Studio/Xcode 설치 후 네이티브 빌드 → 스토어 심사 제출)** — 두 항목 모두 계정 가입·도구 설치 등 사용자 작업 필요.
@@ -479,8 +480,8 @@
 > - **2026-08-29 기록은 Railway + PostgreSQL + Socket.IO 시절 문서**입니다.
 > - **현재 구조와 충돌**: 백엔드는 **Cloudflare Workers + D1**, 프론트는 **Pages Functions**(SSR) + Vite 빌드 → `localhost:5050` API, Socket.IO WSS, `cors()` 전부 **무효**
 > - `npx cap` 패키지(`./node_modules/@capacitor/`) **미설치**, iOS/Android 네이티브 프로젝트 폴더 없음 — **재활성화하려면 의존성+네이티브 프로젝트부터 다시 써야 함(10~15시간 규모)**
-> - **결정**: Step 10(네이티브 앱 출시)은 구조 이주로 **보류** → **Step 23 후보**(별도 검토)
-> - **대신 보류**: PWA(프로그레시브 웹앱) 설치 가능성을 먼저 검토 (Step 24 후보) — 별도 아이콘/스플래시 없이도 `manifest.webmanifest` + `beforeinstallprompt`로 기본 PWA 동작 가능. 모바일에서 현재 `https://tennis-tournament.jplee.workers.dev`는 이미 설치 가능한지 확인 필요
+> - **결정**: Step 10(네이티브 앱 출시)은 구조 이주로 **보류** → **Step 25 후보**(별도 검토 — 2026-09-23: Step 23은 E2E 수정으로 이미 사용됨)
+> - **대신 보류**: PWA(프로그레시브 웹앱) 설치 가능성을 먼저 검토 (**Step 24 후보, 미착수**) — 별도 아이콘/스플래시 없이도 `manifest.webmanifest` + `beforeinstallprompt`로 기본 PWA 동작 가능. 모바일에서 현재 `https://tennis-tournament.jplee.workers.dev`는 이미 설치 가능한지 확인 필요 (2026-09-23 재확인: `manifest.webmanifest`·`beforeinstallprompt` 코드 없음 → PWA 미구현 확정)
 
 ## Step 11: 대회 종목 타입별 참가자 등록 화면 분기 (UI 개선)
 **목표:** matchType + doublesMode 조합(단식/복식 랜덤/복식 팀 페어)에 따라 참가자 탭 UI를 자동 분기. 결정사항 §8-7 구현.
@@ -531,7 +532,7 @@
         - 신규 번들 서빙 확인 (`assets/index-BGH7UVlg.js`)
         - 무토큰 `POST /group-assignments/run` → **401** (가드 정상) / 토큰 → **401 아님**(유효성 400) ✅
         - 토큰으로 대회 생성 **201** · 삭제 **200** · `/auth/me` **200** ✅ (프로브 대회는 삭제 정리 완료)
-    - ⚠️ **잔여**: 운영 DB에 배포검증용 프로브 계정(`probe*@probe.example.com`, role=organizer) 2개 남음 — 유저 삭제 API가 없어 수동 정리 필요(무해)
+    - ~~⚠️ **잔여**: 운영 DB에 배포검증용 프로브 계정(`probe*@probe.example.com`, role=organizer) 2개 남음~~ → **정리 완료**: 2026-09-23 원격 D1 조회(`email like 'probe%'`) **0건** — Railway 시절 계정이며 구조 이주(→D1) 시 정리됨 (2026-09-23 확인)
 
 - [x] **11.1 대진표 조별 순위표 표시 수정 (2026-08-30)** — "예선 조별 승/패/게임득실이 안 보인다" 3중 원인 수정
     - **원인 1 — 참가자 화면**: `ParticipantHome`이 `<TournamentBracket>`에 `tournamentId`를 안 넘김 → 순위 API 호출 자체가 누락(참가자 대진표에는 순위표가 아예 없었음) → `tournamentId={enteredTournament?.id}` 전달로 수정
@@ -589,7 +590,20 @@
     - **검증**: Jest **98/98** · 브라우저 E2E **88/88** · 빌드 ✓
 - **검증**: Jest **98/98** · 브라우저 E2E **88/88** · 빌드 ✓
 
-- [ ] **12.7 참가자 화면 개편 — 대회 목록·상세·프로필** — (2026-09-04 결정, 구현 예정)
+- [ ] **12.7 참가자 화면 개편 — 대회 목록·상세·프로필** — (2026-09-04 결정) **현황(2026-09-23 코드 재검증): 핵심 구현 완료, 잔여 5건**
+    - **✅ 구현 완료 (체크 누락)**:
+        - 하단 탭 3개 `내 정보/대회 상세/내경기` (`ParticipantHome.jsx` — 단 설계의 '대회 목록' 탭은 13.1 입장 화면 검색 목록으로 대체)
+        - 대회 상세 아코디언 4개 📋대회정보/🏆대진·진행현황/👥참가자 명단/📢공지사항 (`TournamentDetail.jsx`)
+        - 백엔드 `location`/`entryFee` POST·PUT 처리(`routes/tournaments.ts`) + 상세 화면 장소·참가비 표시
+        - Notice API(`routes/tournamentNotices.ts`) + 프론트 `fetchNotices`/`createNotice`/`deleteNotice`(`api/tournament.js`)
+        - 백엔드 테스트: `src/backend/tests/notice.test.js`(notice 14건 + entryFee 포함)
+        - E2E: 입장 성공 3탭 판정 + 375px 탭 전환·`대회 상세` 탭 클릭 체크 (`browser_e2e.mjs` 884~993행)
+    - **❌ 잔여**:
+        - 프로필 고도화 — 현재 '이름+변경'만 있고 **이메일·참가 대회 수·내 전적 요약·대회별 내 기록** 없음
+        - **내 참가 대회·기록 API**(`GET /me/tournaments` 등) + `api/tournament.js`의 `fetchMyStats` 미구현
+        - **Dashboard 대회 생성/설정 폼의 장소·참가비 입력 필드** 없음(백엔드·표시만 있고 운영자 입력 UI 부재)
+        - **Dashboard 공지 작성·삭제 UI** 없음(조회 화면 + API만 존재)
+        - E2E 상세 시나리오 — 대회 상세 헤더 장소/비용·아코디언 4섹션·명단·공지 표시·프로필 내 기록 체크 미추가
     - **배경**: 참가자 화면 하단 탭 2개(내경기/대진표)뿐이라 단출 + 대회 정보·공지·장소·참가비 미노출. 사용자 요구: 대회 목록에서 바로 상세 진입 + 대회 상세 안에 대진표 포함 + 프로필(내 정보) 탭 추가
     - **설계**:
       - 하단 탭 3개: 🏠 **내 정보** (디폴트) · 📞 **대회 목록** · 👤 **내경기**
@@ -794,10 +808,10 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - worker `e98e7b0`(main), 프론트 `37e86b8`(master)
 - 프론트 빌드 `index-BcxOFfFi.js` → worker version `63edd89b` (assets 동기화 후 재배포, 프로덕션 번들 확인)
 
-### ⚠️ 남은 수동 작업 — Secret 등록 (사용자 직접)
-`SUPERADMIN_IDS`는 아직 설정하지 않았습니다(미설정 = 기능 비활성).
-- **Cloudflare 대시보드**: Workers & Pages → `tennis-tournament` → Settings → Variables and Secrets → Add → **Secret** → Name `SUPERADMIN_IDS`, Value `6` (여러 명이면 `6,15`)
-- **CLI 대안**: `cd tennis_tournament_worker && npx wrangler secret put SUPERADMIN_IDS` (값 입력 프롬프트)
+### ~~⚠️ 남은 수동 작업 — Secret 등록 (사용자 직접)~~ → **완료 (2026-09-23 확인)**
+`SUPERADMIN_IDS`는 **이미 등록 완료** — `npx wrangler secret list`에 `SUPERADMIN_IDS`, `JWT_SECRET` 둘 다 존재 확인 → 아래 기록은 당시 작업 안내였음(보존).
+- (과거 기록) **Cloudflare 대시보드**: Workers & Pages → `tennis-tournament` → Settings → Variables and Secrets → Add → **Secret** → Name `SUPERADMIN_IDS`, Value `6` (여러 명이면 `6,15`)
+- (과거 기록) **CLI 대안**: `cd tennis_tournament_worker && npx wrangler secret put SUPERADMIN_IDS`
 - 설정 후 즉시 반영(재배포 불필요). 확인: 로그인 후 `GET /auth/me`의 `isSuperAdmin`, 또는 운영 화면 계정 바의 `🛡 최고관리자` 배지
 - **user id 찾기**: `npx wrangler d1 execute tennis_db --remote --json --command "select id,name,email,role from users order by id"`
 - 참고: 운영 DB 기준 후보 — id 6 `sckevinzer@naver.com`(organizer), id 15 `sckevinzer@gmail.com`(user)
@@ -842,4 +856,14 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 
 ### 검증
 - worker `tsc --noEmit`, 프론트 vite build 통과
-- E2E **연속 2회 89 pass / 0 fail** (기존 17 fail 전부 해소, exception 없음)
+- E2E **연속 2회 89 pass / 0 fail** (기존 17 fail 전부 해소, exception 없음) — prod 번들 `index-Bsgzyt9i.js`
+
+### 후속 문서 정리 (2026-09-23)
+- Step 7 요약표 `🔲` → `✅` 표기 수정 (완료 상태 오탐)
+- 8.6d 첫 블록: 구현 완료 4건 기록 갱신 · 8.7: CORS 화이트리스트 반영 완료로 체크(잔여 standings verifyBearer 1건)
+- 10.8 "허용 오리진 강화 권고" → `ALLOWED_ORIGINS` 화이트리스트 구현 완료로 갱신
+- Step 10 보류 메모: 이주 후보 Step 23 → **Step 25**로 수정(Step 23은 본 Step이 사용), PWA는 **Step 24 후보(미착수)** 명시
+- 프로브 계정(`probe*@probe.example.com`) → 원격 D1 조회 0건 확인, 정리 완료로 갱신
+- `SUPERADMIN_IDS` secret 등록 완료 확인(`wrangler secret list`) → 수동 작업 안내는 과거 기록으로 보존
+- 12.7: 핵심(3탭·아코디언 4·Notice API·location/entryFee) 구현 완료 기록 + 잔여 5건(프로필 고도화·내 기록 API·Dashboard 장소/참가비 입력·Dashboard 공지 UI·상세 E2E 시나오) 명시 — 체크박스는 유지
+- 잔여 미착수 확정: **10.6·10.7**(Step 10 보류 + 도구 미설치) · **PWA(Step 24 후보)**
