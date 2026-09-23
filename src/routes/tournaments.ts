@@ -28,7 +28,8 @@ tournamentApi.get('/mine', async (c) => {
 })
 
 // courts JSON 문자열 → 배열 파싱 (프론트 호환, 이중 인코딩된 문자열도 처리)
-function parseTournament(t: any) {
+// P1-4: 참가자 화면/내 기록 API 재사용을 위해 export
+export function parseTournament(t: any) {
   if (t && typeof t.courts === 'string') {
     try {
       // 1차 parse: 정상 JSON 배열이면 배열 반환

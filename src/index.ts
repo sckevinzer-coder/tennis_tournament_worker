@@ -17,6 +17,7 @@ import { matchResultApi } from './routes/matchResults'
 import { scoringRuleApi } from './routes/scoringRules'
 import { rankingSnapshotApi } from './routes/rankingSnapshots'
 import { registrationRequestApi } from './routes/registrationRequests'
+import { meApi } from './routes/me'
 import './routes/tournamentMatches'
 import './routes/tournamentNotices'
 import './routes/tournamentStandings'
@@ -86,6 +87,7 @@ app.route('/match-results', matchResultApi)
 app.route('/scoring-rules', scoringRuleApi)
 app.route('/ranking-snapshots', rankingSnapshotApi)
 app.route('/registration-requests', registrationRequestApi)
+app.route('/me', meApi)
 
 // 루트
 app.get('/', (c) => c.json({ name: 'tennis-tournament', status: 'ok' }))

@@ -590,7 +590,7 @@
     - **검증**: Jest **98/98** · 브라우저 E2E **88/88** · 빌드 ✓
 - **검증**: Jest **98/98** · 브라우저 E2E **88/88** · 빌드 ✓
 
-- [ ] **12.7 참가자 화면 개편 — 대회 목록·상세·프로필** — (2026-09-04 결정) **현황(2026-09-23 코드 재검증): 핵심 구현 완료, 잔여 5건**
+- [x] **12.7 참가자 화면 개편 — 대회 목록·상세·프로필** — (2026-09-04 결정, 2026-09-23 완료)
     - **✅ 구현 완료 (체크 누락)**:
         - 하단 탭 3개 `내 정보/대회 상세/내경기` (`ParticipantHome.jsx` — 단 설계의 '대회 목록' 탭은 13.1 입장 화면 검색 목록으로 대체)
         - 대회 상세 아코디언 4개 📋대회정보/🏆대진·진행현황/👥참가자 명단/📢공지사항 (`TournamentDetail.jsx`)
@@ -598,12 +598,18 @@
         - Notice API(`routes/tournamentNotices.ts`) + 프론트 `fetchNotices`/`createNotice`/`deleteNotice`(`api/tournament.js`)
         - 백엔드 테스트: `src/backend/tests/notice.test.js`(notice 14건 + entryFee 포함)
         - E2E: 입장 성공 3탭 판정 + 375px 탭 전환·`대회 상세` 탭 클릭 체크 (`browser_e2e.mjs` 884~993행)
-    - **❌ 잔여**:
-        - 프로필 고도화 — 현재 '이름+변경'만 있고 **이메일·참가 대회 수·내 전적 요약·대회별 내 기록** 없음
-        - **내 참가 대회·기록 API**(`GET /me/tournaments` 등) + `api/tournament.js`의 `fetchMyStats` 미구현
-        - **Dashboard 대회 생성/설정 폼의 장소·참가비 입력 필드** 없음(백엔드·표시만 있고 운영자 입력 UI 부재)
-        - **Dashboard 공지 작성·삭제 UI** 없음(조회 화면 + API만 존재)
-        - E2E 상세 시나리오 — 대회 상세 헤더 장소/비용·아코디언 4섹션·명단·공지 표시·프로필 내 기록 체크 미추가
+        - **✅ Dashboard 대회 생성/설정 폼 장소·참가비 입력 (2026-09-23)** — 생성 시 `📍 장소`/`💰 참가비` 필드 + 설정(✏️) 폼 수정·저장(빈 값 → null 삭제) (`Dashboard.jsx`)
+        - **✅ Dashboard 공지 작성·삭제 UI (2026-09-23)** — 소유자/최고관리자용 `📢 공지사항 관리` 카드(제목·내용 작성 → 등록, 목록 ·🗑삭제 → 확인 모달), 대회 선택 시 `fetchNotices` 로드 (`Dashboard.jsx`)
+        - **✅ `deleteNotice` URL 버그 수정 (2026-09-23)** — `/notices/:id` → `/tournaments/notices/:id` (worker `/tournaments` 라우터 마운트 경로 불일치, 그간 삭제 UI 부재로 미발각) (`api/tournament.js`)
+        - **✅ 검증**: 신규 `scripts/smoke_12_7.mjs` 27건 전수 통과(생성·설정 저장 API 실측 + 참가자 상세 표출 + 공지 등록/삭제) + 기존 `browser_e2e.mjs` 89/89 회귀 없음
+        - **✅ 프로필 고도화 (2026-09-23)** — 로그인 계정 이름·이메일, 참가/주최 대회 수, 전체 경기 수·승률·승패·게임 득실, 대회별 승패/득실/복식 파트너 표시 + 로딩/오류/재시도 UI
+        - **✅ 내 참가·주최 대회·기록 API (2026-09-23)** — Bearer `GET /me/tournaments`(`routes/me.ts`): 계정 정보, 참가/주최 대회, 복식 팀·파트너, 완료 경기 개인/팀 승패·득실 반환
+        - **✅ E2E 상세 시나리오 (2026-09-23)** — `smoke_profile_12_7.mjs` 9건: 이메일·대회 수·전적 요약·복식 파트너·대회별 기록·375px 화면 검증
+    - **✅ 최종 검증 (2026-09-23)**:
+        - `GET /me/tournaments` 전용 API 시나리오 **18/18 PASS** — 비인증 401, 참가 레코드 없는 운영자 대회, 복식 팀 승패/득실/파트너
+        - 프로필 브라우저 E2E **9/9 PASS** (`scripts/smoke_profile_12_7.mjs`)
+        - Step 12.7 기존 UI/API 스모크 **27/27 PASS** (`scripts/smoke_12_7.mjs`)
+        - 전체 브라우저 E2E **89/89 PASS** (`browser_e2e.mjs`) + `npm run build` + Worker `tsc --noEmit` 통과
     - **배경**: 참가자 화면 하단 탭 2개(내경기/대진표)뿐이라 단출 + 대회 정보·공지·장소·참가비 미노출. 사용자 요구: 대회 목록에서 바로 상세 진입 + 대회 상세 안에 대진표 포함 + 프로필(내 정보) 탭 추가
     - **설계**:
       - 하단 탭 3개: 🏠 **내 정보** (디폴트) · 📞 **대회 목록** · 👤 **내경기**
@@ -865,5 +871,5 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - Step 10 보류 메모: 이주 후보 Step 23 → **Step 25**로 수정(Step 23은 본 Step이 사용), PWA는 **Step 24 후보(미착수)** 명시
 - 프로브 계정(`probe*@probe.example.com`) → 원격 D1 조회 0건 확인, 정리 완료로 갱신
 - `SUPERADMIN_IDS` secret 등록 완료 확인(`wrangler secret list`) → 수동 작업 안내는 과거 기록으로 보존
-- 12.7: 핵심(3탭·아코디언 4·Notice API·location/entryFee) 구현 완료 기록 + 잔여 5건(프로필 고도화·내 기록 API·Dashboard 장소/참가비 입력·Dashboard 공지 UI·상세 E2E 시나오) 명시 — 체크박스는 유지
+- 12.7: 핵심(3탭·아코디언 4·Notice API·location/entryFee) + Dashboard 장소/참가비 입력·공지 작성/삭제 UI·deleteNotice URL 수정 완료(2026-09-23, smoke_12_7.mjs 27건 통과) — 잔여 3건(프로필 고도화·내 기록 API·상세 E2E 시나리오) 명시, 체크박스는 유지
 - 잔여 미착수 확정: **10.6·10.7**(Step 10 보류 + 도구 미설치) · **PWA(Step 24 후보)**
