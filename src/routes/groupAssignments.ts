@@ -1,7 +1,7 @@
 // 조편성 라우트 2/3 — assignments/run + 조회 (기존 groupAssignmentController.run 이전)
 // 마운트: /group-assignments (프론트 호환: POST /group-assignments/run)
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { getDb, type DB } from '../db/client'
 import { groups, groupAssignments, participants, teams, tournaments } from '../db/schema'
 import { assignParticipantsToGroups, type GroupMode } from '../lib/groupAssignment'
@@ -107,8 +107,17 @@ groupAssignmentApi.post('/run', async (c) => {
 })
 
 // GET /group-assignments — 전체 배정 조회
+// ?tournamentId=X — 대회별 조회 (groups 조인). 전체 조회는 DB 누적으로 무거워짐 → 프론트는 이 쿼리를 사용
 groupAssignmentApi.get('/', async (c) => {
   const db = getDb(c.env.DB)
+  const tournamentId = c.req.query('tournamentId')
+  if (tournamentId) {
+    const gs = await db.select({ id: groups.id }).from(groups).where(eq(groups.tournamentId, Number(tournamentId)))
+    const gids = gs.map((g) => g.id)
+    if (gids.length === 0) return c.json([])
+    const list = await db.select().from(groupAssignments).where(inArray(groupAssignments.groupId, gids))
+    return c.json(list)
+  }
   const list = await db.select().from(groupAssignments)
   return c.json(list)
 })

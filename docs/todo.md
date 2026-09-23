@@ -475,6 +475,13 @@
 **실행 순서:** 10.1~10.4(로컬 구성, 완료) → 10.5(✅ Railway 배포 완료) → 10.8(✅ WSS/CORS 점검 완료) → 10.6(아이콘/메타) → 10.7(네이티브 빌드, Android Studio/Xcode 필요)
 **현재(2026-08-29):** **10.1~10.5 + 10.8 완료 — 라이브 서버 가동 중.** 백엔드(API+WSS)+프론트 정적 서빙이 `https://tennistournament-production.up.railway.app`에서 동작하며, 앱은 빌드 시 이 URL을 사용. **잔여: 10.6(스토어 메타)·10.7(로컬에 Android Studio/Xcode 설치 후 네이티브 빌드 → 스토어 심사 제출)** — 두 항목 모두 계정 가입·도구 설치 등 사용자 작업 필요.
 
+> ⚠️ **2026-09-14 점검 결과 (현행 구조 기준 재평가 — 보유한 정보로 충분히 검증 불가)**
+> - **2026-08-29 기록은 Railway + PostgreSQL + Socket.IO 시절 문서**입니다.
+> - **현재 구조와 충돌**: 백엔드는 **Cloudflare Workers + D1**, 프론트는 **Pages Functions**(SSR) + Vite 빌드 → `localhost:5050` API, Socket.IO WSS, `cors()` 전부 **무효**
+> - `npx cap` 패키지(`./node_modules/@capacitor/`) **미설치**, iOS/Android 네이티브 프로젝트 폴더 없음 — **재활성화하려면 의존성+네이티브 프로젝트부터 다시 써야 함(10~15시간 규모)**
+> - **결정**: Step 10(네이티브 앱 출시)은 구조 이주로 **보류** → **Step 23 후보**(별도 검토)
+> - **대신 보류**: PWA(프로그레시브 웹앱) 설치 가능성을 먼저 검토 (Step 24 후보) — 별도 아이콘/스플래시 없이도 `manifest.webmanifest` + `beforeinstallprompt`로 기본 PWA 동작 가능. 모바일에서 현재 `https://tennis-tournament.jplee.workers.dev`는 이미 설치 가능한지 확인 필요
+
 ## Step 11: 대회 종목 타입별 참가자 등록 화면 분기 (UI 개선)
 **목표:** matchType + doublesMode 조합(단식/복식 랜덤/복식 팀 페어)에 따라 참가자 탭 UI를 자동 분기. 결정사항 §8-7 구현.
 
@@ -816,3 +823,23 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 ### 배포
 - worker `a629bd4`+assets동기화(main), 프론트 `527773b`(master)
 - 프론트 빌드 `index-CdX-EljG.js` → 프로덕션 번들 확인
+
+## Step 23: 브라우저 E2E 17건 실패 수정 (2026-09-23 완료)
+
+**목표**: `browser_e2e.mjs` 기존 **72 pass / 17 fail** → 전부 통과.
+
+### 원인과 수정 (앱 버그 3 + 테스트 4)
+1. **[앱] `/groups`·`/group-assignments` 기본 100건 페이지네이션 캡** — 신규 대회의 조/조편성이 조 현황·배지에서 안 뜸
+   - worker `groupAssignments` GET: `?tournamentId=` 지원(그룹 id 조회 후 필터링, `inArray` 도입)
+   - 프론트 `tournament.js`: `fetchGroups(tournamentId)` → `?tournamentId=..&limit=500`, `fetchGroupAssignments(tournamentId)` 전달
+   - `Dashboard.jsx`: 두 fetch에 `selectedTournament.id` 전달
+2. **[앱] 파트너 추가 후 팀명 미갱신** — `1인팀A·김미래` 형식 미표시 → Dashboard에서 완성 시 팀 name 갱신
+3. **[테스트] `enterByCode`가 ID로 검색** — 타 대회명 숫자부와 겹쳐 다수 결과 → id→대회명 변환 후 이름 검색
+4. **[테스트] 조 수 카운트가 전역 `/groups`(캡)** — per-tournament `?tournamentId=&limit=500`(`countGroupsOf`)
+5. **[테스트] React number input 삼중클릭 미선택 → '22'** — native value setter로 2조 입력
+6. **[테스트] 하단 nav 인디케이터 셀렉터** — 실제 클래스 `text-slate-900`로 교정
+7. **[테스트] [8a] select option이 과거 잔재 대회를 잡음(S-06 차단)** — `includes('복식팀E2E')` 첫 매칭이 오래된 대회 → **입장 tid와 같은 option을 value로 선택**, tid 조회도 `.filter().pop()`(최신)으로 통일 + `?limit=500`. `[8]` evaluate 직전 문서 안정화 대기로 `Execution context was destroyed` 방어
+
+### 검증
+- worker `tsc --noEmit`, 프론트 vite build 통과
+- E2E **연속 2회 89 pass / 0 fail** (기존 17 fail 전부 해소, exception 없음)

@@ -9,7 +9,7 @@
 - 프론트: `isSuperAdmin` 배지 + 모든 대회 관리 탭·삭제 버튼 노출
 - 검증: superadmin_check 9/9, roleuser_check 5/5, E2E 72 pass / 17 fail (회귀 없음)
 - 배포: worker `e98e7b0` / 프론트 `37e86b8`, worker version `63edd89b`
-- **남은 작업**: Cloudflare 대시보드에 `SUPERADMIN_IDS` Secret 등록 (사용자 직접) — 미설정 시 기능 비활성
+- ✅ `SUPERADMIN_IDS` Secret 등록 완료 — `sckevinzer`(id 18) 최고관리자 동작 확인 (완료)
 
 ## Step 20: UI 개선 2차 (완료) — B·C·D·E·F·A 전부
 
