@@ -1,6 +1,17 @@
 
 
-## Step 20: UI 개선 2차 (2026-09-21 계획)
+## Step 21: 최고관리자 계정 (2026-09-21 완료)
+
+특정 계정을 최고관리자로 지정해 **모든 대회를 관리·삭제**할 수 있게 함.
+
+- 지정: Secret `SUPERADMIN_IDS` (콤마 구분 user id, 예 `6,15`) — `wrangler.toml` 미사용, DB 변경 없음
+- 백엔드: `isSuperAdmin()` / `hasOrganizerAccess()` 신설, `requireTournamentOwner`에 `env` 전달 + 최고관리자 우회, 라우트 역할 가드 37곳 치환
+- 프론트: `isSuperAdmin` 배지 + 모든 대회 관리 탭·삭제 버튼 노출
+- 검증: superadmin_check 9/9, roleuser_check 5/5, E2E 72 pass / 17 fail (회귀 없음)
+- 배포: worker `e98e7b0` / 프론트 `37e86b8`, worker version `63edd89b`
+- **남은 작업**: Cloudflare 대시보드에 `SUPERADMIN_IDS` Secret 등록 (사용자 직접) — 미설정 시 기능 비활성
+
+## Step 20: UI 개선 2차 (완료) — B·C·D·E·F·A 전부
 
 우선순위 (Plan 모드 합의):
 1. **B 로딩 스피너 통일** — 운영자 `Dashboard.jsx` 616행 `로딩 중...` → 참가자 화면과 동일한 스피너 (`role="status"`, 테니스볼 lime 보더)

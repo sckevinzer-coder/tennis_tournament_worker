@@ -752,3 +752,45 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - **검증**: vite build 통과
 - **E2E** (`browser_e2e.mjs`): **69 pass / 20 fail** — 원복 상태(69/20)와 동일, 회귀 없음. `리셋 후 경기 목록 비어짐`·`재생성 후 경기 복구` 통과로 모달 교체 후 리셋 흐름 정상 확인
 - **배포**: 프론트 `291adad`(master) — 빌드 `index-DeJxOriH.js` → worker version `fc397df2` (assets 수동 동기화 후 재배포, 프로덕션 번들 확인)
+
+## Step 21: 최고관리자(Superadmin) — 모든 대회 관리·삭제 (2026-09-21 완료)
+
+**목표**: 특정 계정(최고관리자)으로 로그인하면 본인 소유가 아닌 대회도 관리·삭제할 수 있게 한다.
+
+### 설계 결정
+- **지정 방식**: Secret `SUPERADMIN_IDS`에 **user id 목록(콤마 구분)** 등록 (예: `"6,15"`). `wrangler.toml`에 두지 않고 Cloudflare 측 Secret으로만 관리 → 레포에 값 미노출
+- **DB 변경 없음**: `users.role`에 새 역할을 추가하지 않음 (마이그레이션 불필요)
+- **역할 무관**: 최고관리자는 `role='user'`여도 운영자 권한 획득 (별도 organizer 가입 불필요)
+- **미설정 시 무동작**: Secret이 비어 있으면 기존 권한 체크와 완전히 동일 (안전한 기본값)
+
+### 구현
+- `src/lib/ownership.ts`
+  - `isSuperAdmin(env, userId)` 신설 — `SUPERADMIN_IDS` 파싱 후 id 포함 여부 판별
+  - `hasOrganizerAccess(env, userId, role)` 신설 — `role==='organizer' || isSuperAdmin(...)`
+  - `requireTournamentOwner(db, env, userId, tournamentId)`로 시그니처 확장 — 최고관리자는 소유권 검사 우회, **대회 미존재 시 404는 유지**
+- 라우트 전역 치환 (37곳, 14개 파일): `c.get('role') !== 'organizer'` → `!hasOrganizerAccess(c.env, c.get('userId'), c.get('role'))`
+- `requireTournamentOwner` 호출부 13곳에 `c.env` 전달
+- `worker-configuration.d.ts`: `SUPERADMIN_IDS?: string` 추가
+- 응답 필드: `POST /auth/register`, `POST /auth/login`, `GET /auth/me`에 `user.isSuperAdmin` 추가
+- 프론트 `Dashboard.jsx`: `isOwner = isSuperAdmin || myTournamentIds.has(id)` → 최고관리자는 모든 대회에서 관리 탭·삭제 버튼 노출, 비소유 대회 선택 시 탭 되돌림 예외 처리
+- 프론트 배지: `Dashboard.jsx` 상세 카드 `🛡 최고관리자` / `AccountBar.jsx` 계정 바 `🛡 최고관리자`
+
+### 검증 (로컬, `scripts/superadmin_check.mjs` + `scripts/superadmin_roleuser_check.mjs`)
+- `SUPERADMIN_IDS` 미설정 상태: 비소유 주최자 삭제 **403 차단** ✅
+- `SUPERADMIN_IDS=85`: 로그인 응답 `isSuperAdmin=true`, 타 주최 대회 **참가자 등록 201 / 매치 생성 403 아님 / 삭제 200** ✅
+- `SUPERADMIN_IDS=85,90` (90은 `role='user'`): role=user 최고관리자가 **대회 생성 201 / 타 주최 대회 삭제 200** ✅
+- 일반 주최자는 여전히 **403 차단** ✅
+- **합계: 9 pass / 0 fail + 5 pass / 0 fail**
+- E2E 회귀 (`browser_e2e.mjs`): **72 pass / 17 fail** — 기존 실패 목록과 동일, 신규 회귀 없음
+
+### 배포
+- worker `e98e7b0`(main), 프론트 `37e86b8`(master)
+- 프론트 빌드 `index-BcxOFfFi.js` → worker version `63edd89b` (assets 동기화 후 재배포, 프로덕션 번들 확인)
+
+### ⚠️ 남은 수동 작업 — Secret 등록 (사용자 직접)
+`SUPERADMIN_IDS`는 아직 설정하지 않았습니다(미설정 = 기능 비활성).
+- **Cloudflare 대시보드**: Workers & Pages → `tennis-tournament` → Settings → Variables and Secrets → Add → **Secret** → Name `SUPERADMIN_IDS`, Value `6` (여러 명이면 `6,15`)
+- **CLI 대안**: `cd tennis_tournament_worker && npx wrangler secret put SUPERADMIN_IDS` (값 입력 프롬프트)
+- 설정 후 즉시 반영(재배포 불필요). 확인: 로그인 후 `GET /auth/me`의 `isSuperAdmin`, 또는 운영 화면 계정 바의 `🛡 최고관리자` 배지
+- **user id 찾기**: `npx wrangler d1 execute tennis_db --remote --json --command "select id,name,email,role from users order by id"`
+- 참고: 운영 DB 기준 후보 — id 6 `sckevinzer@naver.com`(organizer), id 15 `sckevinzer@gmail.com`(user)
