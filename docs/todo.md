@@ -986,6 +986,13 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 
 ### 25.11 위치 기반 대회 검색 (2026-09-24)
 
+- [x] Kakao Maps JavaScript SDK `LocationPicker` 연결 (`VITE_KAKAO_MAP_KEY`)
+- [x] 지도 클릭 시 위도·경도 자동 입력, 수동 입력 fallback 유지
+- [x] Kakao 키 미설정 시 지도 SDK를 로드하지 않고 수동 좌표 입력으로 정상 동작
+- [x] 프론트 빌드 통과
+- [x] E2E 89/89 통과
+- [x] 프론트 커밋·푸시: `a53b094`
+- [x] Worker 배포 version: `8be824d5-e566-425e-8492-9a17fb0dce34`
 - [x] `Tournament.latitude`/`longitude` 좌표 필드 및 D1 마이그레이션 `0005_location.sql`
 - [x] Worker POST/PUT 좌표 검증(위도 -90~90, 경도 -180~180)
 - [x] 운영자 대회 생성·수정 폼에 위도·경도 입력
