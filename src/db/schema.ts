@@ -1,6 +1,6 @@
 // 테니스 대회 관리 — Drizzle 스키마 (D1/SQLite)
 // migrations/0000_init.sql과 1:1 대응. ENUM은 앱 레벨 검증.
-import { sqliteTable, integer, text, index } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, integer, real, text, index } from 'drizzle-orm/sqlite-core'
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -35,6 +35,8 @@ export const tournaments = sqliteTable('tournaments', {
   gamesPerPlayer: integer('gamesPerPlayer').default(4),
   format: text('format').notNull().default('tournament'),
   location: text('location'),
+  latitude: real('latitude'),
+  longitude: real('longitude'),
   entryFee: text('entryFee'),
   courts: text('courts'), // JSON text (string array)
   createdAt: text('createdAt').notNull().default("datetime('now')"),

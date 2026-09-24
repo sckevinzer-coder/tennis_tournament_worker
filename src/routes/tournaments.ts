@@ -91,6 +91,12 @@ function normalizeTournamentBody(body: Record<string, unknown>) {
     out.format = body.format
   }
   if (body.location !== undefined) out.location = body.location ?? null
+  if (body.latitude !== undefined) out.latitude = body.latitude === null || body.latitude === '' ? null : Number(body.latitude)
+  if (body.longitude !== undefined) out.longitude = body.longitude === null || body.longitude === '' ? null : Number(body.longitude)
+  const lat = Number(out.latitude);
+  const lon = Number(out.longitude);
+  if (out.latitude != null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) throw new Error('latitude must be between -90 and 90')
+  if (out.longitude != null && (!Number.isFinite(lon) || lon < -180 || lon > 180)) throw new Error('longitude must be between -180 and 180')
   if (body.entryFee !== undefined) out.entryFee = body.entryFee ?? null
   if (body.courts !== undefined) {
     let arr: string[]
