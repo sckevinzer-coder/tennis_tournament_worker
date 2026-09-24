@@ -610,6 +610,9 @@
         - 프로필 브라우저 E2E **9/9 PASS** (`scripts/smoke_profile_12_7.mjs`)
         - Step 12.7 기존 UI/API 스모크 **27/27 PASS** (`scripts/smoke_12_7.mjs`)
         - 전체 브라우저 E2E **89/89 PASS** (`browser_e2e.mjs`) + `npm run build` + Worker `tsc --noEmit` 통과
+        - **✅ 재검증 (2026-09-24)**: 장소 입력이 `LocationPicker`의 `placeholder="장소명을 입력하세요"`를 사용함에 맞춰 `smoke_12_7.mjs` selector 수정. 프로필 E2E **9/9 PASS**, 12.7 UI/API 스모크 **27/27 PASS**, 전체 브라우저 E2E **89/89 PASS**, 프론트 빌드 통과. Worker 운영 `/auth/me` 비인증 응답 **401** 및 `/health` **200** 확인.
+        - **✅ 운영 배포·최종 확인 (2026-09-24)**: Worker version `000d8450-3da6-4e3a-9237-ac34dfdd4654`, 번들 `index-D0CKLXIN.js` / `index-cn0OwPtj.css` 반영. 루트 HTML 신규 번들 참조, JS/CSS 200, `/health` 200, 비인증 `/auth/me` 401 확인.
+
     - **배경**: 참가자 화면 하단 탭 2개(내경기/대진표)뿐이라 단출 + 대회 정보·공지·장소·참가비 미노출. 사용자 요구: 대회 목록에서 바로 상세 진입 + 대회 상세 안에 대진표 포함 + 프로필(내 정보) 탭 추가
     - **설계**:
       - 하단 탭 3개: 🏠 **내 정보** (디폴트) · 📞 **대회 목록** · 👤 **내경기**
