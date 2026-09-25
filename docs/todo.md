@@ -1022,6 +1022,7 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - [x] Worker 커밋·푸시: `de6c5d2` (`main`)
 - [x] 운영 검증 잔여 데이터 정리 — `map_probe_*`·`profile-e2e-*`·`e2e_*`·`ws_test_*`·`reset_*`·IDOR 프로브(`ownerx`/`stranger`) 계정과 검증 대회(E2E·리셋테스트·S06/S17 프로브) 삭제
 - [x] 정리 후 운영 D1: 계정 8개(admin/tester/demo/sckevinzer 계열만), 대회 5개, 참가자 9명, 경기 10개, 신청 0건
+
 ### 25.13 PWA 설치 지원 + 레거시 코드 정리 (2026-09-25)
 
 **PWA (Step 24 — 구현 완료)**
