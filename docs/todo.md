@@ -1022,6 +1022,26 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - [x] Worker 커밋·푸시: `de6c5d2` (`main`)
 - [x] 운영 검증 잔여 데이터 정리 — `map_probe_*`·`profile-e2e-*`·`e2e_*`·`ws_test_*`·`reset_*`·IDOR 프로브(`ownerx`/`stranger`) 계정과 검증 대회(E2E·리셋테스트·S06/S17 프로브) 삭제
 - [x] 정리 후 운영 D1: 계정 8개(admin/tester/demo/sckevinzer 계열만), 대회 5개, 참가자 9명, 경기 10개, 신청 0건
+### 25.13 PWA 설치 지원 + 레거시 코드 정리 (2026-09-25)
+
+**PWA (Step 24 — 구현 완료)**
+- [x] `manifest.webmanifest` — name/short_name/start_url/scope/`display: standalone`/theme_color + 192·512·maskable 아이콘
+- [x] 아이콘: `app-icon.svg`(네이비+라임 테니스볼) → `icon-192.png`·`icon-512.png`·`apple-touch-icon.png` 렌더링(헤드리스 Chrome)
+- [x] `sw.js` — 설치 조건 충족용 fetch 핸들러, **캐시 미사용**(배포 직후 번들 stale 방지) + `main.jsx`에서 등록
+- [x] `InstallPrompt.jsx` — `beforeinstallprompt`를 잡아 설치 버튼 제공, iOS Safari는 "공유 → 홈 화면에 추가" 안내, 닫으면 재노출 안 함
+- [x] `index.html` — manifest·theme-color·apple-touch-icon·apple-mobile-web-app-* 메타 추가, `lang="ko"`, 타이틀 "테니스 대회 관리"
+- [x] 운영 브라우저 검증(헤드리스 Chrome): `Page.getAppManifest` 오류 **0**, `Page.getInstallabilityErrors` **0**, SW `activated` + 페이지 제어, 아이콘 200, 설치 카드 노출, 콘솔 오류 0 → **10 pass / 0 fail**
+- [x] `manifest.webmanifest` 응답 HTTP 200 + `application/manifest+json`
+
+**레거시 정리**
+- [x] 프론트 저장소에서 Railway 시절 코드 삭제 — `src/backend/`(Express+Sequelize), `backend/`, 루트 `package.json`·`package-lock.json`·`railpack.json`, `docs/SECURITY.md`, `src/test/realtime_test.sh` → **79파일 / 18,596줄 제거**, 루트는 `DOCS.md` + `src/frontend`만 남음
+
+**커밋·배포**
+- [x] 프론트: `6e61d65`(레거시 정리) · `add16cb`(PWA) — `master` 푸시
+- [x] Worker: `6269754`(PWA 자산·문서) — `main` 푸시, 배포 version `3d629aa1-20a5-4eea-b2b0-86c5768d179a`
+- [x] 운영 서빙 번들 `index-Dtoj_u7a.js` == 로컬 `dist` 일치 확인
+
+
 
 
 
