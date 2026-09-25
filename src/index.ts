@@ -69,11 +69,58 @@ app.use('*', async (c, next) => {
   c.res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
   c.res.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://tennis-tournament.jplee.workers.dev; frame-ancestors 'none'"
+    "default-src 'self'; script-src 'self' https://dapi.kakao.com https://t1.daumcdn.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.daumcdn.net https://*.kakao.com; connect-src 'self' https://tennis-tournament.jplee.workers.dev https://*.daumcdn.net https://*.kakao.com; frame-src 'self' https://*.daumcdn.net https://*.kakao.com; frame-ancestors 'none'"
   )
 })
 
 app.get('/health', (c) => c.json({ ok: true, app: c.env.APP_NAME || 'tennis-worker' }))
+
+// Kakao Maps SDK는 일부 브라우저에서 공식 CDN 직접 로딩이 차단될 수 있으므로
+// 공식 SDK 경로만 동일 출처로 중계한다. 클라이언트가 URL을 지정할 수 없다.
+app.get('/map/kakao-sdk', async (c) => {
+  const appKey = c.req.query('appkey') || ''
+  if (!/^[a-zA-Z0-9]+$/.test(appKey)) {
+    return c.json({ message: 'Invalid map key' }, 400)
+  }
+  let upstream: Response | null = null
+  // Kakao CDN은 간헐적으로 Worker egress 요청을 거부할 수 있으므로 짧게 재시도한다.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const candidate = await fetch(
+        `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(appKey)}&autoload=false`,
+        { headers: { Accept: 'application/javascript' } },
+      )
+      if (candidate.ok) {
+        upstream = candidate
+        break
+      }
+      if (candidate.status < 500 && candidate.status !== 429) break
+    } catch {
+      // 네트워크 오류는 한 번 더 시도한다.
+    }
+    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 150))
+  }
+  if (!upstream) {
+    return c.json({ message: 'Map SDK unavailable' }, 502)
+  }
+  const source = await upstream.text()
+  // Kakao 로더가 자기 script.src에서 appkey를 추출하도록 같은 출처 경로를
+  // 인식시키고, 자동 엔진 로딩은 autoload=false로 비활성화한다.
+  // 클라이언트가 maps.load()를 호출하면 SDK가 공식 엔진 스크립트를
+  // 순서대로 동적 삽입하므로 document.write 우회가 필요 없다.
+  const proxiedSource = source.replace(
+    '/\\/(beta-)?dapi\\.kakao\\.com\\/v2\\/maps\\/sdk\\.js\\b/',
+    '/\\/map\\/kakao-sdk\\b/',
+  )
+  return new Response(proxiedSource, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/javascript; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+})
 
 // 라우트 마운트 (기존 tennis_tournament 경로 유지)
 app.route('/auth', authApi)
