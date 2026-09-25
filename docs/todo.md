@@ -1046,6 +1046,38 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 
 
 
+## Step 26: 운영 안정화 — 테스트/배포 자동화 · D1 백업 · 로그아웃 API (2026-09-25 완료)
+
+**배경:** 25.13까지 기능 구현은 완료됐으나, ①테스트 실행 경로 오류 ②프론트 배포가 매번 수동 3단계 ③D1 백업/복구 절차 문서 부재 ④서버측 토큰 무효화(로그아웃) 미구현 상태다. 기능 추가 없이 "앞으로의 변경을 안전·신속하게" 만드는 기반 작업을 진행한다.
+
+### 26.1 테스트 실행 경로 정비
+- [x] `npm run test:e2e` 경로 오류 수정 (`src/frontend/scripts/browser_e2e.mjs` 직접 지정)
+- [x] 스모크/E2E를 npm 스크립트로 노출 (`smoke`, `smoke:profile`, `smoke:group`, `e2e:local`)
+- [x] `run_e2e_local.sh` 개선 — 시작 전 잔여 프로세스 선제 정리, 종료 시 vite/wrangler 프로세스 정리(좀비 방지), 콘솔과 log 파일 동시 tee 출력, 실행 결과 요약 출력
+
+### 26.2 프론트 배포 자동화
+- [x] worker `scripts/deploy_frontend.sh` — 프론트 빌드 → `dist/` → `assets/` 동기화(구 번들 제거) → `wrangler deploy` → 운영 자산 검증을 한 번에 수행
+- [x] `npm run deploy:frontend` 추가 (수동 복사 3단계 제거)
+
+### 26.3 D1 백업/복구 런북
+- [x] `docs/BACKUP.md` — `wrangler d1 export` 백업, 복구 절차, 주기·보관 정책, 시크릿/계정 주의사항
+- [x] worker `npm run db:export` — 원격 D1 스냅샷을 `backups/`에 날짜 파일명으로 저장
+- [x] `.gitignore`에 `backups/` 추가 및 `docs/README.md` 업데이트
+
+### 26.4 로그아웃 API (S-11 잔여)
+- [x] `revoked_tokens` 테이블 마이그레이션(0006_revoked_tokens.sql) + Drizzle 스키마 추가
+- [x] JWT에 `jti`(토큰 고유 ID) 추가 + `POST /auth/logout` 구현(해당 토큰 무효화, 만료 행 자동 정리)
+- [x] `authOptional` 미들웨어와 WebSocket upgrade에서 폐기된 토큰 차단
+- [x] 프론트: `logoutUser()` API 추가 + `AccountBar.jsx` 로그아웃 버튼 연동(서버 실패해도 로컬 정리는 유지)
+- [x] 검증 — 로그아웃된 토큰은 401 차단 및 WebSocket 차단, 신규 로그인/다른 토큰은 정상 유지
+
+### 검증 · 배포
+- [x] 프론트 빌드 통과 · worker `tsc --noEmit` 통과
+- [x] 로컬 통합 E2E 회귀 (`browser_e2e.mjs` 89 pass / 0 fail 통과)
+- [x] 마이그레이션 로컬·원격 적용 (`0006_revoked_tokens.sql` local/remote applied)
+- [x] 운영 배포 (`npm run deploy:frontend` 성공 완료 및 라이브 검증 완료)
+
+
 ---
 
 

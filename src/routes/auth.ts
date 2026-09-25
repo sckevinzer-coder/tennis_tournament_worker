@@ -5,7 +5,8 @@ import { getDb } from '../db/client'
 import { users, organizers } from '../db/schema'
 import type { AppEnv } from '../middleware/auth'
 import { createUserWithOrganizer, verifyPassword, hashPassword, signJwt, jwtSecret } from '../lib/auth'
-import { isSuperAdmin } from '../lib/ownership'
+import { isSuperAdmin, recordAudit } from '../lib/ownership'
+import { revokeToken } from '../lib/tokenRevocation'
 
 export const authApi = new Hono<AppEnv>()
 
@@ -144,6 +145,20 @@ authApi.post('/reset-password', async (c) => {
   const passwordHash = await hashPassword(newPassword)
   await db.update(users).set({ passwordHash, updatedAt: new Date().toISOString() }).where(eq(users.id, user.id))
   return c.json({ message: '비밀번호가 재설정되었습니다. 새 비밀번호로 로그인하세요.' })
+})
+
+// POST /logout — 현재 토큰 무효화 (Step 26.4 / S-11 잔여)
+// JWT는 stateless이므로 jti를 폐기 목록에 기록해 서버측에서 차단한다.
+authApi.post('/logout', async (c) => {
+  const userId = c.get('userId')
+  if (!userId) return c.json({ message: '인증이 필요합니다' }, 401)
+  const jti = c.get('jti')
+  // jti가 없는 토큰(이 기능 이전 발급분)은 만료까지 유효 — 클라이언트에서 삭제하도록 안내
+  if (!jti) return c.json({ ok: true, revoked: false, message: '구버전 토큰: 만료 시까지 유효합니다' })
+  const db = getDb(c.env.DB)
+  await revokeToken(db, { jti, userId, role: c.get('role'), exp: c.get('tokenExp') })
+  await recordAudit(db, userId, 'auth.logout', 'user', userId)
+  return c.json({ ok: true, revoked: true })
 })
 
 // GET /me — Bearer 필수

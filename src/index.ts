@@ -3,6 +3,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { jwtSecret, verifyJwt } from './lib/auth'
+import { getDb } from './db/client'
+import { isTokenRevoked } from './lib/tokenRevocation'
 import type { AppEnv } from './middleware/auth'
 import { authOptional } from './middleware/auth'
 import { authApi } from './routes/auth'
@@ -171,6 +173,9 @@ async function handleWebSocketUpgrade(request: Request, env: any): Promise<Respo
   }
   if (!payload) {
     return new Response('Invalid or expired token', { status: 401 })
+  }
+  if (env.DB && await isTokenRevoked(getDb(env.DB), payload.jti)) {
+    return new Response('Token has been revoked', { status: 401 })
   }
 
   // S-17: 구독 범위 — 인증된 사용자만 WS 연결·구독 허용.

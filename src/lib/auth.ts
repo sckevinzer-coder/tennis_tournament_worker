@@ -59,11 +59,12 @@ function b64urlDecode(str: string): Uint8Array {
   return Uint8Array.from(bin, (c) => c.charCodeAt(0))
 }
 
-export type JwtPayload = { sub: number; role: string; exp: number }
+// Step 26.4: JWT에 jti(토큰 고유 ID) 포함 — 로그아웃 시 개별 토큰 무효화에 사용
+export type JwtPayload = { sub: number; role: string; exp: number; jti?: string }
 
-export async function signJwt(payload: Omit<JwtPayload, 'exp'>, secret: string, ttlSeconds = JWT_DEFAULT_TTL_SECONDS): Promise<string> {
+export async function signJwt(payload: Omit<JwtPayload, 'exp' | 'jti'>, secret: string, ttlSeconds = JWT_DEFAULT_TTL_SECONDS): Promise<string> {
   const header = b64urlEncode(new TextEncoder().encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })))
-  const body = b64urlEncode(new TextEncoder().encode(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + ttlSeconds })))
+  const body = b64urlEncode(new TextEncoder().encode(JSON.stringify({ ...payload, jti: crypto.randomUUID(), exp: Math.floor(Date.now() / 1000) + ttlSeconds })))
   const data = `${header}.${body}`
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data))

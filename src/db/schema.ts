@@ -195,3 +195,12 @@ export const rankingSnapshots = sqliteTable('ranking_snapshots', {
   createdAt: text('createdAt').notNull().default("datetime('now')"),
   updatedAt: text('updatedAt').notNull().default("datetime('now')"),
 })
+
+// Step 26.4: 로그아웃된 토큰 폐기 목록 (jti 단위)
+export const revokedTokens = sqliteTable('revoked_tokens', {
+  jti: text('jti').primaryKey(),
+  userId: integer('userId'),
+  role: text('role'),
+  expiresAt: integer('expiresAt').notNull(),
+  createdAt: text('createdAt').notNull().default("datetime('now')"),
+})
