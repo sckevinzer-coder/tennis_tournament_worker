@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="테니스 대회 관리 아이콘">
+  <rect width="512" height="512" fill="#0f172a"/>
+  <circle cx="256" cy="256" r="148" fill="#a3e635"/>
+  <path d="M138 152c70 40 108 96 114 168" fill="none" stroke="#0f172a" stroke-width="22" stroke-linecap="round"/>
+  <path d="M374 360c-70-40-108-96-114-168" fill="none" stroke="#0f172a" stroke-width="22" stroke-linecap="round"/>
+</svg>

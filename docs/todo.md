@@ -468,20 +468,20 @@
     - [x] **라이브 검증**: `/` 200(text/html, React 앱 로딩) · `/tournaments` 200(JSON) · Socket.IO **WSS 연결 OK**
     - [x] 프론트 `.env`를 공개 URL(`VITE_API_BASE_URL`/`VITE_SOCKET_URL` = https://tennistournament-production.up.railway.app)로 교체 → 재빌드·커밋 (앱/웹 모두 이 URL 사용)
     - [x] **Cleartext/ATS 예외 제거 → HTTPS 전용 확정**: Android `usesCleartextTraffic="false"`, iOS `NSAllowsArbitraryLoads` 제거 (스토어 정책 준수)
-- [ ] **10.6 앱 아이콘·스플래시·스토어 메타데이터** — `@capacitor/assets` 또는 네이티브 리소스로 아이콘/스플래시 교체(현재 기본 Capacitor 아이콘), 앱 이름·패키지 확인, 스토어 설명·스크린샷·개인정보처리방침 준비 — **보류 유지** (2026-09-23 재확인: `@capacitor` 미설치·`manifest.webmanifest` 없음 → Step 10 미착수 상태와 동일)
+- [ ] **10.6 앱 아이콘·스플래시·스토어 메타데이터** — 네이티브 리소스 아이콘/스플래시 교체(현재 기본 Capacitor 아이콘), 앱 이름·패키지 확인, 스토어 설명·스크린샷·개인정보처리방침 준비 — **보류 유지** (2026-09-25 재확인: `@capacitor/*` 8.5.0 설치됨 + `android/`(53파일)·`ios/`(20파일) 네이티브 프로젝트 **존재**, `capacitor.config.json` 있음 → 도구는 준비됨, 아이콘/메타만 미착수)
 - [ ] **10.7 네이티브 빌드 검증** — Android Studio(`npm run android`)로 APK/AAB 빌드, Xcode(`npm run ios`)로 Archive → TestFlight/Play Console 내부테스트 배포 — **보류 유지**
-    - ⚠️ **로컬 환경 블로커**: 현재 `gradle`/`ANDROID_HOME`/Android Studio/Xcode 미설치 → 사용자 설치 후 진행 필요 (2026-09-23 재확인: `android/`·`ios/` 네이티브 프로젝트 폴더 자체도 없음)
+    - ⚠️ **로컬 환경 블로커**: 현재 `gradle`/`ANDROID_HOME`/Android Studio/Xcode 미설치 → 사용자 설치 후 진행 필요 (2026-09-25 재확인: `android/`·`ios/` 네이티브 프로젝트 폴더는 **존재**하므로 도구 설치만 선행되면 빌드 시도 가능)
 - [x] **10.8 CORS/Socket 프로덕션 점검** — 라이브 서버에서 `cors()` 전체 허용 동작(네이티브 WebView origin 접근 가능) 확인 + **Socket.IO WSS 실측 연결 성공**(`socket.io-client`로 https URL websocket transport 검증). ~~허용 오리진 명시로 강화 권장~~ → **강화 완료**: worker `src/index.ts`에 `ALLOWED_ORIGINS` 화이트리스트(localhost:5173 + tennis-tournament.jplee.workers.dev) 구현 — 미허용 origin은 `null` 반환으로 거부 (2026-09-23 확인)
 
 **실행 순서:** 10.1~10.4(로컬 구성, 완료) → 10.5(✅ Railway 배포 완료) → 10.8(✅ WSS/CORS 점검 완료) → 10.6(아이콘/메타) → 10.7(네이티브 빌드, Android Studio/Xcode 필요)
 **현재(2026-08-29):** **10.1~10.5 + 10.8 완료 — 라이브 서버 가동 중.** 백엔드(API+WSS)+프론트 정적 서빙이 `https://tennistournament-production.up.railway.app`에서 동작하며, 앱은 빌드 시 이 URL을 사용. **잔여: 10.6(스토어 메타)·10.7(로컬에 Android Studio/Xcode 설치 후 네이티브 빌드 → 스토어 심사 제출)** — 두 항목 모두 계정 가입·도구 설치 등 사용자 작업 필요.
 
-> ⚠️ **2026-09-14 점검 결과 (현행 구조 기준 재평가 — 보유한 정보로 충분히 검증 불가)**
+> ⚠️ **2026-09-25 재점검 결과 (현행 구조 기준)**
 > - **2026-08-29 기록은 Railway + PostgreSQL + Socket.IO 시절 문서**입니다.
-> - **현재 구조와 충돌**: 백엔드는 **Cloudflare Workers + D1**, 프론트는 **Pages Functions**(SSR) + Vite 빌드 → `localhost:5050` API, Socket.IO WSS, `cors()` 전부 **무효**
-> - `npx cap` 패키지(`./node_modules/@capacitor/`) **미설치**, iOS/Android 네이티브 프로젝트 폴더 없음 — **재활성화하려면 의존성+네이티브 프로젝트부터 다시 써야 함(10~15시간 규모)**
-> - **결정**: Step 10(네이티브 앱 출시)은 구조 이주로 **보류** → **Step 25 후보**(별도 검토 — 2026-09-23: Step 23은 E2E 수정으로 이미 사용됨)
-> - **대신 보류**: PWA(프로그레시브 웹앱) 설치 가능성을 먼저 검토 (**Step 24 후보, 미착수**) — 별도 아이콘/스플래시 없이도 `manifest.webmanifest` + `beforeinstallprompt`로 기본 PWA 동작 가능. 모바일에서 현재 `https://tennis-tournament.jplee.workers.dev`는 이미 설치 가능한지 확인 필요 (2026-09-23 재확인: `manifest.webmanifest`·`beforeinstallprompt` 코드 없음 → PWA 미구현 확정)
+> - **현재 구조**: 백엔드는 **Cloudflare Workers + D1 + Durable Object**, 프론트는 **Vite 빌드 → Worker 정적 자산** 서빙 → `localhost:5050` API, Socket.IO WSS, `cors()` 전부 **무효**
+> - **정정**: `@capacitor/*` 8.5.0 **설치되어 있고** `android/`·`ios/` 네이티브 프로젝트와 `capacitor.config.json`도 **존재**한다(이전 "미설치·폴더 없음" 기록은 오류). 남은 것은 10.6(아이콘·스토어 메타)과 10.7(로컬 SDK 설치 후 실제 빌드)뿐
+> - **결정**: Step 10(네이티브 앱 출시)은 **보류 유지**(웹 우선) → **Step 25 후보**(별도 검토 — Step 23은 E2E 수정으로 이미 사용됨)
+> - **PWA(Step 24)**: 2026-09-25 **구현 완료** — `manifest.webmanifest` + 192/512/maskable 아이콘 + `sw.js`(fetch 핸들러) + `beforeinstallprompt` 설치 카드 + iOS Safari 안내. 설치형 앱은 PWA로 먼저 제공하고, 스토어 배포(10.6·10.7)는 이후 진행
 
 ## Step 11: 대회 종목 타입별 참가자 등록 화면 분기 (UI 개선)
 **목표:** matchType + doublesMode 조합(단식/복식 랜덤/복식 팀 페어)에 따라 참가자 탭 UI를 자동 분기. 결정사항 §8-7 구현.
@@ -875,7 +875,7 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - 프로브 계정(`probe*@probe.example.com`) → 원격 D1 조회 0건 확인, 정리 완료로 갱신
 - `SUPERADMIN_IDS` secret 등록 완료 확인(`wrangler secret list`) → 수동 작업 안내는 과거 기록으로 보존
 - 12.7: 핵심(3탭·아코디언 4·Notice API·location/entryFee) + Dashboard 장소/참가비 입력·공지 작성/삭제 UI·deleteNotice URL 수정 완료(2026-09-23, smoke_12_7.mjs 27건 통과) — 잔여 3건(프로필 고도화·내 기록 API·상세 E2E 시나리오) 명시, 체크박스는 유지
-- 잔여 미착수 확정: **10.6·10.7**(Step 10 보류 + 도구 미설치) · **PWA(Step 24 후보)**
+- 잔여 미착수 재확정(2026-09-25): **10.6·10.7**(Step 10 보류 — 도구는 설치되어 있고 네이티브 프로젝트도 존재, 로컬 SDK·아이콘/메타만 남음) · **PWA는 구현 완료로 이관** · 시드 순위 기준·bye 우선순위·시간대 스케줄링·푸시 알림·팀 개인 랭킹은 별도 확장 과제
 
 ---
 
