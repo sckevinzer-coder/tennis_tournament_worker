@@ -1008,6 +1008,21 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - [x] 위도·경도 수동 입력 필드가 화면에 표시되지 않음 확인
 
 **주의:** Kakao Maps SDK를 사용할 때 `VITE_KAKAO_MAP_KEY`가 있어야 지도가 활성화된다. 키가 없거나 SDK 로딩이 실패하면 지도 오류 안내가 표시된다. 좌표가 없는 대회는 주변 검색에서 제외되고 일반 대회 목록에는 정상 표시된다. 지도 초기화는 Worker의 고정 Kakao SDK 중계 경로를 사용한다.
+### 25.12 Kakao 지도 로더 수정 및 운영 검증 데이터 정리 (2026-09-24)
+
+- [x] Worker `/map/kakao-sdk` 고정 중계에 업스트림 재시도(2회) 추가, 앱키 전달 유지
+- [x] CSP에 Kakao 지도 엔진·타일 도메인만 제한 허용
+- [x] `LocationPicker`가 `autoload=false` + `maps.load()`로 동일 출처 중계 경로에서 SDK 로드
+- [x] 지도 초기화 실패 시 안내 메시지 표시(빈 지도 방지)
+- [x] 위도·경도 수동 입력 UI 미노출 유지
+- [x] 운영 `/health` 200, `/map/kakao-sdk` HTTP 200(4,116 bytes), 프론트 번들 `index-D8StOGNR.js` 서빙 확인
+- [x] 프론트 빌드 통과(368.11 kB) / Worker `tsc --noEmit` + `wrangler build --dry-run` 통과
+- [x] 프론트 커밋·푸시: `348454e` (`master`)
+- [x] Worker 커밋·푸시: `de6c5d2` (`main`)
+- [x] 운영 검증 잔여 데이터 정리 — `map_probe_*`·`profile-e2e-*`·`e2e_*`·`ws_test_*`·`reset_*`·IDOR 프로브(`ownerx`/`stranger`) 계정과 검증 대회(E2E·리셋테스트·S06/S17 프로브) 삭제
+- [x] 정리 후 운영 D1: 계정 8개(admin/tester/demo/sckevinzer 계열만), 대회 5개, 참가자 9명, 경기 10개, 신청 0건
+
+
 
 ---
 
