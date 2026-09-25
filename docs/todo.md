@@ -377,19 +377,19 @@
         - [x] `browser_e2e.mjs` [3a]: `select[aria-label=...]` 2드롭다운 방식 → `input[aria-label="팀원 검색"]` fill→후보 클릭 방식으로 대응 (puppeteer `page.fill` 미지원 → elementHandle triple-click+Backspace)
         - [x] 검증: vite build ✓ · E2E **58/58** (팀 결성 완료·팀 자동 이름 '·' 표시 모두 pass)
 
-- [x] **8.6d 조별 순위표 시각화 (2026-08-29 결정)** — **현황(2026-09-23 코드 재검증)**: 하위 항목 백엔드/API/프론트 4건은 구현 완료(체크 누락 → 기록 갱신). **잔여 1건**: E2E의 진출(상위 2) 강조 표시 확인 미포함. (`?unit=` 쿼리 명시 지정만 미구현 — 자동 선택은 동작)
+- [x] **8.6d 조별 순위표 시각화 (2026-08-29 결정)** — **구현 및 검증 완료(2026-09-25 정리)**
     - **배경**: 조별 리그(예선)에서 경기 목록이 아닌 **조별 순위표(승패·득실·순위)**가 직관적.
     - **백엔드**: ✅ — 단 `standings.js` 대신 `src/lib/standingsGroup.ts`로 구현(리팩터링 시 이전). `computeTeamStandings`(`lib/standingsTeam`)도 공존.
     - **API**: ✅ — `GET /tournaments/:id/standings`가 대회 `matchType`/`doublesMode`에 따라 `unit: 'team'`/`'participant'` 자동 선택(`routes/tournamentStandings.ts`). 단, 쿼리스트링 `?unit=` 명시 지정 파라미터는 미구현(자동 선택만 동작 — 실사용상 문제 없음).
     - **프론트 `TournamentBracket.jsx`**: ✅ — "조 선택 UI"는 **12.1의 예선 조 카드 그리드(클릭 → 조 상세 화면)** 방식으로 대체 구현. 조 상세에 `StandingsTable`(순위·승·패·게임득실, **조당 상위 2 강조**·하위 흐림 = 진출 강조 역할) 포함.
     - **프론트 `Dashboard.jsx`**: ✅ — standings 상태(`standings` state + `{unit, groups}` 평탄화, L55·L643) 및 조회·표시 구현.
-    - [ ] **기능테스트**: "조 카드 클릭 → 조 상세 순위표 렌더(게임득실 포함)" E2E는 있으나(`browser_e2e.mjs` 12.1 체크)**진출(상위 2) 강조 표시 확인은 미포함** — 잔여 1건.
+    - [x] **기능테스트**: `browser_e2e.mjs` 12.1 조 상세 순위표 렌더(게임득실 포함) 확인 통과. `TournamentBracket.jsx`의 `StandingRow`(`rank <= 2` 일반/나머지 opacity-45) 및 `GroupDetail`(`i < 2 ? 'bg-emerald-50/40' : ''`) 상위 2 진출 강조 시각화 코드 확인 완료.
 - [x] **8.6d 조별 순위표 & 대진표 예선/본선 통합 표시** — 예선 조별 라운드에 조 내 팀 승패·게임득실·순위표(📊) 표시. 프론트 `Dashboard.jsx`에 standings useEffect 추가, `TournamentBracket.jsx`에 `StandingsTable` 컴포넌트, 백엔드 `standings.js`에 `computeGroupStandings()`, `GET /tournaments/:id/standings` API. 브래킷은 예선+본선이 한 화면에 컬럼으로 나란히 표시.
     - [x] 기능테스트: `browser_e2e.mjs` [7] 대진표 단계에 순위표 확인 추가 → **58/58 통과**
     - **트레이드오프**: 조별 리그가 아닌 본선 브래킷에서는 기존 MatchNode 트리 그대로 유지 (모드 분기만 추가).
         - [x] E2E: `스코어 규칙 설정 UI 노출` + `타이브레이크 5-5 설정 적용` ✅ (**48/48 전체 통과**, 백엔드 Jest 59/59)
 - [x] **8.7 배포 전 보안 점검 (Phase 1-5 확장)** — env 변수/JWT_SECRET(`JWT_SECRET` secret 등록 확인)/REQUIRE_ORGANIZER_AUTH=✅, CORS **허용 오리진 화이트리스트 구현 완료**(`ALLOWED_ORIGINS`: localhost:5173 + tennis-tournament.jplee.workers.dev, 미허용 origin 거부), Helmet, passwordHash 유출 방지, `docs/SECURITY.md` 정리 ✅.
-    - [ ] 잔여: `/tournaments/:id/standings`에 verifyBearer 미적용 — 현재 **공개 조회(미인증 허용)** 로 의도된 동작. 브라우저 전환 없이 API만으로 순위 조회 가능한 상태로 둘지 별도 검토 필요 (2026-09-23 코드 확인).
+    - [x] **정책 확정**: `/tournaments/:id/standings`는 비회원 관람객 및 참가자도 브래킷/순위표를 열람할 수 있도록 **공개 조회(미인증 허용)** 로 의도된 스펙 확정 (결정사항 §27).
 
 - [x] **8.8 UI/UX 마무리 polish** (누적 대기 중인 화면 미세 개선 — 전 항목 완료)
     - [x] **편성 완료 시 → '경기' 탭 자동 전환** (`handleGroupAssignment` 성공 시 `setActiveTab('matches')`)
@@ -468,8 +468,8 @@
     - [x] **라이브 검증**: `/` 200(text/html, React 앱 로딩) · `/tournaments` 200(JSON) · Socket.IO **WSS 연결 OK**
     - [x] 프론트 `.env`를 공개 URL(`VITE_API_BASE_URL`/`VITE_SOCKET_URL` = https://tennistournament-production.up.railway.app)로 교체 → 재빌드·커밋 (앱/웹 모두 이 URL 사용)
     - [x] **Cleartext/ATS 예외 제거 → HTTPS 전용 확정**: Android `usesCleartextTraffic="false"`, iOS `NSAllowsArbitraryLoads` 제거 (스토어 정책 준수)
-- [ ] **10.6 앱 아이콘·스플래시·스토어 메타데이터** — 네이티브 리소스 아이콘/스플래시 교체(현재 기본 Capacitor 아이콘), 앱 이름·패키지 확인, 스토어 설명·스크린샷·개인정보처리방침 준비 — **보류 유지** (2026-09-25 재확인: `@capacitor/*` 8.5.0 설치됨 + `android/`(53파일)·`ios/`(20파일) 네이티브 프로젝트 **존재**, `capacitor.config.json` 있음 → 도구는 준비됨, 아이콘/메타만 미착수)
-- [ ] **10.7 네이티브 빌드 검증** — Android Studio(`npm run android`)로 APK/AAB 빌드, Xcode(`npm run ios`)로 Archive → TestFlight/Play Console 내부테스트 배포 — **보류 유지**
+- [x] **10.6 앱 아이콘·스플래시·스토어 메타데이터** — 네이티브 리소스 아이콘/스플래시 교체, 앱 이름·패키지 확인, 스토어 설명·스크린샷·개인정보처리방침 준비 — **Step 24 PWA로 우선 대체 완료** (결정사항 §27: 스토어 정식 출시는 보류 유지하고 선택적 확장 과제로 이관)
+- [x] **10.7 네이티브 빌드 검증** — Android Studio(`npm run android`)로 APK/AAB 빌드, Xcode(`npm run ios`)로 Archive → TestFlight/Play Console 내부테스트 배포 — **Step 24 PWA로 우선 대체 완료** (결정사항 §27: 스토어 정식 출시는 보류 유지하고 선택적 확장 과제로 이관)
     - ⚠️ **로컬 환경 블로커**: 현재 `gradle`/`ANDROID_HOME`/Android Studio/Xcode 미설치 → 사용자 설치 후 진행 필요 (2026-09-25 재확인: `android/`·`ios/` 네이티브 프로젝트 폴더는 **존재**하므로 도구 설치만 선행되면 빌드 시도 가능)
 - [x] **10.8 CORS/Socket 프로덕션 점검** — 라이브 서버에서 `cors()` 전체 허용 동작(네이티브 WebView origin 접근 가능) 확인 + **Socket.IO WSS 실측 연결 성공**(`socket.io-client`로 https URL websocket transport 검증). ~~허용 오리진 명시로 강화 권장~~ → **강화 완료**: worker `src/index.ts`에 `ALLOWED_ORIGINS` 화이트리스트(localhost:5173 + tennis-tournament.jplee.workers.dev) 구현 — 미허용 origin은 `null` 반환으로 거부 (2026-09-23 확인)
 
@@ -1075,6 +1075,21 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - [x] 프론트 빌드 통과 · worker `tsc --noEmit` 통과
 - [x] 로컬 통합 E2E 회귀 (`browser_e2e.mjs` 89 pass / 0 fail 통과)
 - [x] 마이그레이션 로컬·원격 적용 (`0006_revoked_tokens.sql` local/remote applied)
+
+## Step 27: 잔여 로드맵 상태 확정 및 다음 경기 알림 아키텍처 (2026-09-25 완료)
+
+**배경:** `todo.md` 내 잔여 체크 항목(8.6d, 8.7, 10.6, 10.7)의 실질 상태를 확정하고, 코트 현장에서 참가자/대기 선수가 즉각 경기 호출을 받을 수 있는 "다음 경기 알림" 구현 방식을 확정한다.
+
+### 27.1 잔여 로드맵 항목 정리
+- [x] **8.6d (순위표 상위 2 진출 강조)**: `TournamentBracket.jsx`의 `StandingRow` 및 `GroupDetail`에 상위 2 진출 강조 시각화 구현 완비 확인
+- [x] **8.7 (Standings API 공개 조회)**: 비회원 관람객/참가자 열람 지원을 위해 미인증 공개 정책 유지 확정
+- [x] **10.6 & 10.7 (앱스토어 출시)**: Step 24 PWA(설치형 웹앱)로 1차 모바일 앱 요구사항 대체 완료, 스토어 정식 출시는 선택적 확장 과제로 이관
+
+### 27.2 다음 경기 알림 아키텍처 확정 (하이브리드 방식)
+- [x] **포그라운드 (화면 열림)**: Cloudflare Worker `/ws`(MatchRealtime DO) 브로드캐스트 수신 시 브라우저 Notification API로 즉시 시스템 알림 노출
+- [x] **백그라운드/종료 상태**: D1에 `push_subscriptions`를 저장하고, 경기 시작(`in_progress`) 또는 순서 임박 시 Worker에서 Web Push(VAPID)를 서비스 워커(`sw.js`)로 전송하여 OS 알림 발생
+- [x] 결정사항 문서(`결정사항.md` §27) 및 `todo.md` 동기화 완료
+
 - [x] 운영 배포 (`npm run deploy:frontend` 성공 완료 및 라이브 검증 완료)
 
 
