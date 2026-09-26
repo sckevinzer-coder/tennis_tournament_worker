@@ -78,6 +78,45 @@ app.use('*', async (c, next) => {
 
 app.get('/health', (c) => c.json({ ok: true, app: c.env.APP_NAME || 'tennis-worker' }))
 
+// Step 29: 카카오 장소 키워드 검색 프록시 — JS SDK services 실패/ZERO_RESULT 시 폴백
+// REST 키는 서버 secret(KAKAO_REST_KEY)으로만 보관, 클라이언트에 노출하지 않는다.
+app.get('/map/places', async (c) => {
+  const restKey = String((c.env as { KAKAO_REST_KEY?: string }).KAKAO_REST_KEY ?? '').trim()
+  if (!restKey) {
+    return c.json({ message: '장소 검색 서버 설정이 필요합니다 (운영자에게 문의해 주세요)' }, 503)
+  }
+  const keyword = (c.req.query('keyword') || '').trim().slice(0, 50)
+  if (!keyword) return c.json({ message: 'keyword가 필요합니다' }, 400)
+  let upstream: Response | null = null
+  try {
+    upstream = await fetch(
+      `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(keyword)}&size=8`,
+      { headers: { Authorization: `KakaoAK ${restKey}` } },
+    )
+  } catch {
+    upstream = null
+  }
+  if (!upstream) return c.json({ message: '장소 검색 요청 실패' }, 502)
+  if (!upstream.ok) {
+    if (upstream.status === 401 || upstream.status === 403) {
+      return c.json({ message: '장소 검색 인증 실패 (REST 키 확인 필요)' }, 502)
+    }
+    return c.json({ message: '장소 검색 실패' }, 502)
+  }
+  const json = await upstream.json().catch(() => null) as {
+    documents?: { id?: string; place_name?: string; road_address_name?: string; address_name?: string; phone?: string; x?: string; y?: string }[]
+  } | null
+  const documents = (json?.documents || []).slice(0, 8).map((d, i) => ({
+    id: d.id || `rest-${i}`,
+    place_name: d.place_name || '',
+    road_address_name: d.road_address_name || '',
+    address_name: d.address_name || '',
+    phone: d.phone || '',
+    x: d.x || '', y: d.y || '',
+  }))
+  return c.json({ documents })
+})
+
 // Kakao Maps SDK는 일부 브라우저에서 공식 CDN 직접 로딩이 차단될 수 있으므로
 // 공식 SDK 경로만 동일 출처로 중계한다. 클라이언트가 URL을 지정할 수 없다.
 app.get('/map/kakao-sdk', async (c) => {
