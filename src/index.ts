@@ -85,12 +85,16 @@ app.get('/map/kakao-sdk', async (c) => {
   if (!/^[a-zA-Z0-9]+$/.test(appKey)) {
     return c.json({ message: 'Invalid map key' }, 400)
   }
+  // Step 29: 장소 키워드 검색용 services 라이브러리 전달 (값은 화이트리스트로 제한)
+  const rawLibs = c.req.query('libraries') || ''
+  const libraries = rawLibs.split(',').map((s) => s.trim()).filter((s) => /^[a-z]+$/.test(s)).slice(0, 5).join(',')
+  const libsParam = libraries ? `&libraries=${encodeURIComponent(libraries)}` : ''
   let upstream: Response | null = null
   // Kakao CDN은 간헐적으로 Worker egress 요청을 거부할 수 있으므로 짧게 재시도한다.
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const candidate = await fetch(
-        `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(appKey)}&autoload=false`,
+        `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(appKey)}&autoload=false${libsParam}`,
         { headers: { Accept: 'application/javascript' } },
       )
       if (candidate.ok) {
