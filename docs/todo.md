@@ -1093,8 +1093,61 @@ Step 15~17 완료 후 남은 UI 개선 포인트를 화면별로 조사·정리�
 - [x] 운영 배포 (`npm run deploy:frontend` 성공 완료 및 라이브 검증 완료)
 
 
----
+## Step 28: 다음 경기 Web Push 알림 (2026-09-25 완료)
 
+**배경:** Step 27.2에서 확정한 하이브리드 알림 아키텍처(포그라운드 WebSocket/Notification + 백그라운드 VAPID Web Push)를 구현한다. 코트 현장에서 앱을 켜두지 않은(백그라운드/종료) 참가자/대기 선수에게도 경기 시작 OS 알림을 전달한다.
+
+### 28.1 구독 API (Worker)
+- [x] `push_subscriptions` 테이블 신설 (endpoint 고유, `participantId`·`tournamentId` 선택 연결)
+- [x] `POST /push/subscribe` — PushSubscription(endpoint·keys.p256dh·keys.auth) 저장/갱신 (endpoint 기반 upsert)
+- [x] `POST /push/unsubscribe` — endpoint 삭제
+- [x] `GET /push/vapid-public-key` — 공개키 반환 (환경변수 미설정 시 503)
+
+### 28.2 경기 시작 푸시 전송 (Worker)
+- [x] 매치 상태를 `in_progress`로 전이하는 API(`routes/matches.ts`)에서 `notifyMatchStarted()` 발송 — `ctx.waitUntil()`로 응답 지연 없음
+- [x] 제목: `🎾 경기 시작 — {코트}`, 본문: `코트로 이동해 주세요!`
+- [x] VAPID 시크릿(`VAPID_PRIVATE_KEY` 등)은 **Worker secrets**에만 보관 (클라이언트 미노출)
+
+### 28.3 프론트엔드 연동
+- [x] `src/api/push.js` — 권한 요청 → `pushManager.subscribe` → 서버 저장, `subscribePush`/`unsubscribePush`/구독 상태 조회
+- [x] `public/sw.js` — `push` 이벤트 핸들러로 OS 알림 표시 (`showNotification`)
+- [x] `PushAlertCard.jsx` — 푸시 구독 권유/해제 UI
+- [x] VAPID **공개키**는 `.env.production`의 `VITE_VAPID_PUBLIC_KEY`로 고정 (로드 시 fetch 지연 제거), `.env.example` 갱신
+
+### 28.4 검증 · 커밋
+- [x] 빌드·타입체크·E2E 통과, 운영 배포 후 라이브 검증 완료
+- [x] 프론트 커밋: `4d2e000` (`master`) · Worker 커밋: `2cfb916` (`main`)
+
+
+## Step 29: 카카오 장소 키워드 검색 (서버 프록시) + 내 주변 대회 좌표 필터 수정 (2026-09-26 완료)
+
+**배경:** 대회 생성/수정 화면의 장소 지정을 위해 카카오 JS SDK `services.Places.keywordSearch`를 도입했으나, 등록된 JS 키 기준으로 모든 키워드가 `ZERO_RESULT`로 실패했다. 또한 "내 주변 대회" 목록에 좌표 없는 대회가 거리 계산에 포함되는 버그가 있었다.
+
+### 29.1 장소 검색 UI (프론트엔드)
+- [x] `LocationPicker.jsx` — 검색 폼(`🔍 카카오맵 장소 검색`) + 결과 목록(이름·주소·전화) + 지도 마커 이동, 선택 시 `location`(이름+주소)·`latitude`(y)·`longitude`(x) 패치 갱신
+- [x] 지도 클릭으로도 좌표 지정 가능 (기존 유지)
+- [x] SDK `services` 라이브러리 로드 — Worker 중계 경로 `/map/kakao-sdk?libraries=services` 사용 (`script.async = false` 유지)
+
+### 29.2 서버 프록시 (Worker)
+- [x] `GET /map/places?keyword=...` 신설 — 카카오 **REST API**(`/v2/local/search/keyword`) 프록시
+- [x] REST 키는 **Worker secret `KAKAO_REST_KEY`** 에만 보관, 클라이언트에 노출하지 않음
+- [x] 응답은 카카오 원본 포맷(`documents`) 그대로 전달 → 프론트가 SDK 결과와 동일하게 처리
+
+### 29.3 폴백 로직 (프론트엔드)
+- [x] 1차: JS SDK 검색 시도 → 2차: 실패·`ZERO_RESULT`·오류 시 서버 프록시(`/map/places`)로 자동 재시도
+- [x] `placesRef` 미설정(로드 실패)이면 즉시 프록시로 검색
+
+### 29.4 내 주변 대회 좌표 필터 버그 수정
+- [x] **원인**: `Number.isFinite(Number(t.latitude))` 필터가 `Number(null) === 0`인 오탐으로 좌표 없는 대회가 전부 통과 → (0,0) 기준 허위 거리(약 9,000km)로 정렬·노출
+- [x] **수정**: `latitude/longitude`가 null·빈문자열이 아닌 실값인 경우만 통과(`hasCoords`)
+- [x] 좌표 미등록 대회는 "좌표가 등록된 주변 대회가 없습니다" 안내로 안내
+
+### 29.5 검증 · 커밋 · 배포
+- [x] 프록시 실측 — `keyword=tennis` → 올림픽테니스경기장 등 정상, `keyword=올림픽공원` → 8건 정상
+- [x] lint 0 오류 · Vite 빌드 성공 · 운영 번들 `index-CV__lhL2.js` 서빙 확인
+- [x] 프론트 커밋: `93b48f2`(검색 UI) · `ade0c15`(프록시 폴백) · `24f6b10`(좌표 필터) (`master`)
+- [x] Worker 커밋: `97660a1`(SDK services 전달) · `0bb49e7`(프록시) · `729d6c8`(빌드 동기화) (`main`)
+- [x] Worker 배포 version `62e53e8f-953e-402f-aee7-3cd218b5aa8d` — 운영 라이브 검증 완료
 
 
 ---
