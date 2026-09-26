@@ -7,6 +7,7 @@ import { matches, matchResults } from '../db/schema'
 import { submitScore, confirmMatch, stringifySets } from '../lib/matchScore'
 import { onMatchCompleted } from '../lib/bracketService'
 import { publishMatchUpdate } from '../lib/realtime'
+import { notifyMatchStarted } from '../lib/webPush'
 import { recordAudit, hasOrganizerAccess } from '../lib/ownership'
 import type { AppEnv } from '../middleware/auth'
 import { parsePagination } from '../lib/ownership'
@@ -70,6 +71,7 @@ matchApi.put('/:id', async (c) => {
     // 기존 동작 (단순 저장) — 하위 호환
     const [m] = await db.select().from(matches).where(eq(matches.id, id)).limit(1)
     if (!m) return c.json({ message: 'Match not found' }, 404)
+    const prevStatus = m.status
     const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() }
     if (body.score1 != null) patch.score1 = Number(body.score1)
     if (body.score2 != null) patch.score2 = Number(body.score2)
@@ -83,6 +85,27 @@ matchApi.put('/:id', async (c) => {
       patch.court = cv || null
     }
     const [updated] = await db.update(matches).set(patch as never).where(eq(matches.id, id)).returning()
+    // 실시간 브로드캐스트: 상태 변경 시 WS 전파
+    const pubType =
+      updated.status === 'completed' ? 'match_completed'
+      : updated.status === 'in_progress' ? 'match_started'
+      : 'score_updated'
+    publishMatchUpdate(c.env, Number(updated.tournamentId), Number(updated.id), pubType, {
+      score1: updated.score1, score2: updated.score2, sets: updated.sets,
+      winnerId: updated.winnerId, status: updated.status, court: updated.court,
+    })
+    // Step 28: 경기 시작(in_progress 전환) 시 구독자에게 Web Push 전송 (응답 지연 방지: waitUntil)
+    if (prevStatus !== 'in_progress' && updated.status === 'in_progress') {
+      const snapshot = {
+        id: Number(updated.id), tournamentId: Number(updated.tournamentId),
+        court: updated.court ?? null,
+        participant1Id: updated.participant1Id ?? null, participant2Id: updated.participant2Id ?? null,
+        participant3Id: updated.participant3Id ?? null, participant4Id: updated.participant4Id ?? null,
+      }
+      const pushTitle = `🎾 경기 시작${updated.court ? ` — ${updated.court}` : ''}`
+      const envSnap = c.env as unknown as Parameters<typeof notifyMatchStarted>[0]
+      c.executionCtx.waitUntil(notifyMatchStarted(envSnap, snapshot, pushTitle, '코트로 이동해 주세요!'))
+    }
     recordAudit(db, c.get('userId'), 'match.update', 'match', id, Object.keys(patch).reduce((acc, k) => ({ ...acc, [k]: updated[k as keyof typeof updated] }), {} as Record<string, unknown>))
     return c.json(updated)
   } catch (e) {

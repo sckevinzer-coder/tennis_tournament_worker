@@ -4,7 +4,7 @@
 export interface MatchUpdatedPayload {
   tournamentId: number
   matchId: number
-  type: 'score_updated' | 'match_completed' | 'bracket_updated'
+  type: 'score_updated' | 'match_completed' | 'bracket_updated' | 'match_started'
   data: Record<string, unknown>
 }
 

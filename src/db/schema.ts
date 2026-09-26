@@ -204,3 +204,21 @@ export const revokedTokens = sqliteTable('revoked_tokens', {
   expiresAt: integer('expiresAt').notNull(),
   createdAt: text('createdAt').notNull().default("datetime('now')"),
 })
+
+// Step 28: 웹 푸시(Web Push) 구독 정보
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  userId: integer('userId').references(() => users.id, { onDelete: 'cascade' }),
+  participantId: integer('participantId').references(() => participants.id, { onDelete: 'cascade' }),
+  tournamentId: integer('tournamentId').references(() => tournaments.id, { onDelete: 'cascade' }),
+  createdAt: text('createdAt').notNull().default("datetime('now')"),
+  updatedAt: text('updatedAt').notNull().default("datetime('now')"),
+}, (t) => ({
+  participantIdx: index('idx_push_participant').on(t.participantId),
+  tournamentIdx: index('idx_push_tournament').on(t.tournamentId),
+  userIdx: index('idx_push_user').on(t.userId),
+}))
+
